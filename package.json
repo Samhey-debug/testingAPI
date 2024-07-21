@@ -1,14 +1,13 @@
 {
-  "name": "testingAPI",
+  "name": "my-netlify-api",
   "version": "1.0.0",
   "description": "A Netlify project with a serverless function to clone Discord guilds",
-  "main": "netlify/functions/clone-server.js",
+  "main": "netlify/functions/cloneGuild.js",
   "scripts": {
     "start": "netlify dev"
   },
   "dependencies": {
-  "node-fetch": "^2.6.1"
-}
+    "node-fetch": "^2.6.1"
   },
   "engines": {
     "node": "16.x"
