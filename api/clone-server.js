@@ -8,14 +8,15 @@ const fetchWithRetry = async (url, options, maxRetries = 3) => {
         try {
             const response = await fetch(url, options);
             if (response.ok) return response;
+            console.error(`HTTP error ${response.status} for URL ${url}`);
             throw new Error(`HTTP error ${response.status}`);
         } catch (error) {
-            console.error(`Attempt ${retries + 1} failed: ${error.message}`);
+            console.error(`Attempt ${retries + 1} failed for URL ${url}: ${error.message}`);
             retries++;
             await sleep(1000);
         }
     }
-    console.warn(`Max retries reached for ${url}`);
+    console.warn(`Max retries reached for URL ${url}`);
     return null;
 };
 
