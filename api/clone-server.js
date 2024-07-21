@@ -1,97 +1,119 @@
 const fetch = require('node-fetch');
 
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
 const fetchWithRetry = async (url, options, maxRetries = 3) => {
-    for (let retries = 0; retries < maxRetries; retries++) {
+    let retries = 0;
+    while (retries < maxRetries) {
         try {
             const response = await fetch(url, options);
             if (response.ok) return response;
             throw new Error(`HTTP error ${response.status}`);
         } catch (error) {
-            if (retries === maxRetries - 1) throw error;
-            await new Promise(resolve => setTimeout(resolve, 1500)); // 1-second delay
+            console.error(`Attempt ${retries + 1} failed: ${error.message}`);
+            retries++;
+            await sleep(1000);
         }
     }
+    console.warn(`Max retries reached for ${url}`);
+    return null;
 };
 
 module.exports = async (req, res) => {
     const { token, sourceGuildId, targetGuildId } = req.query;
-    let output = '';
-    let errors = [];
-
+    let output = '', errors = [];
+    
     try {
-        // Fetch channels from source and target guilds
-        const [sourceChannels, targetChannels] = await Promise.all([
-            fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}/channels`, {
-                headers: { 'Authorization': `Bot ${token}` }
-            }).then(response => response.json()),
-            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
-                headers: { 'Authorization': `Bot ${token}` }
-            }).then(response => response.json())
+        const fetchData = async (endpoint) =>
+            fetchWithRetry(`https://discord.com/api/v10${endpoint}`, {
+                headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' }
+            }).then(res => res.json());
+
+        const [sourceChannels, targetChannels, sourceRoles, targetRoles] = await Promise.all([
+            fetchData(`/guilds/${sourceGuildId}/channels`),
+            fetchData(`/guilds/${targetGuildId}/channels`),
+            fetchData(`/guilds/${sourceGuildId}/roles`),
+            fetchData(`/guilds/${targetGuildId}/roles`)
         ]);
 
         output += `Fetched ${sourceChannels.length} source and ${targetChannels.length} target channels.\n`;
+        output += `Fetched ${sourceRoles.length} source and ${targetRoles.length} target roles.\n`;
 
-        // Phase 1: Delete all target channels
-        await Promise.all(targetChannels.map(channel =>
-            fetchWithRetry(`https://discord.com/api/v10/channels/${channel.id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bot ${token}` }
-            }).then(() => output += `Deleted channel: ${channel.name}\n`)
-            .catch(error => errors.push(`Failed to delete channel ${channel.name}: ${error.message}`))
-        ));
-
-        // Phase 2: Create categories and roles
-        const categories = sourceChannels.filter(c => c.type === 4);
-        const roles = (await fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}/roles`, {
-            headers: { 'Authorization': `Bot ${token}` }
-        }).then(response => response.json())).filter(role => role.name !== '@everyone');
-
-        const categoryMap = {};
+        // Delete target channels and roles
         await Promise.all([
-            ...categories.map(category =>
-                fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify(category)
-                }).then(response => response.json().then(createdCategory => {
-                    categoryMap[category.id] = createdCategory.id;
-                    output += `Created category: ${createdCategory.name}\n`;
-                }))
-                .catch(error => errors.push(`Failed to create category: ${error.message}`))
+            ...targetChannels.map(channel =>
+                fetchWithRetry(`https://discord.com/api/v10/channels/${channel.id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bot ${token}` }
+                }).then(() => output += `Deleted channel: ${channel.name}\n`)
             ),
-            ...roles.map(role =>
-                fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify(role)
-                }).then(response => response.json().then(createdRole => {
-                    output += `Created role: ${createdRole.name}\n`;
-                }))
-                .catch(error => errors.push(`Failed to create role: ${error.message}`))
+            ...targetRoles.filter(role => role.name !== '@everyone').map(role =>
+                fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles/${role.id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bot ${token}` }
+                }).then(() => output += `Deleted role: ${role.name}\n`)
             )
         ]);
 
-        // Phase 3: Create channels
-        const channels = sourceChannels.filter(c => c.type !== 4).map(c => ({
-            ...c,
-            parent_id: categoryMap[c.parent_id] || null
-        }));
+        // Create additional channel
+        const additionalChannel = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: "Copied with Nebula Services", type: 0, position: 0 })
+        }).then(res => res.json());
+        
+        let additionalChannelId;
+        if (additionalChannel) {
+            additionalChannelId = additionalChannel.id;
+            output += `Created additional channel: ${additionalChannel.name}\n`;
+        } else {
+            output += 'Failed to create additional channel.\n';
+            errors.push('Failed to create additional channel.');
+        }
 
-        await Promise.all(channels.map(channel =>
-            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
+        const categoryMap = {};
+        const createChannel = async (channel) => {
+            const payload = { ...channel, parent_id: categoryMap[channel.parent_id] || null };
+            if (channel.type === 4) { // Category
+                const createdCategory = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).then(res => res.json());
+                if (createdCategory) {
+                    categoryMap[channel.id] = createdCategory.id;
+                    output += `Created category: ${createdCategory.name}\n`;
+                }
+            } else { // Other channels
+                const createdChannel = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).then(res => res.json());
+                if (createdChannel) output += `Created channel: ${createdChannel.name}\n`;
+            }
+        };
+
+        await Promise.all(sourceChannels.map(createChannel));
+
+        // Create roles
+        await Promise.all(sourceRoles.filter(role => role.name !== '@everyone').map(role =>
+            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(channel)
-            }).then(response => response.json().then(createdChannel => {
-                output += `Created channel: ${createdChannel.name}\n`;
-            }))
-            .catch(error => errors.push(`Failed to create channel: ${error.message}`))
+                body: JSON.stringify(role)
+            }).then(res => res.json())
+            .then(createdRole => output += `Created role: ${createdRole.name}\n`)
+            .catch(() => {
+                output += `Failed to create role: ${role.name}\n`;
+                errors.push(`Failed to create role: ${role.name}`);
+            })
         ));
 
-        // Update guild details
-        const sourceGuild = await fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}`, {
+        // Update target guild details
+        const sourceGuild = await fetchWithRetry(`/guilds/${sourceGuildId}`, {
             headers: { 'Authorization': `Bot ${token}` }
-        }).then(response => response.json());
+        }).then(res => res.json());
 
         const updatePayload = {
             name: sourceGuild.name,
@@ -101,16 +123,55 @@ module.exports = async (req, res) => {
             explicit_content_filter: sourceGuild.explicit_content_filter
         };
 
-        await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}`, {
+        const updatedGuild = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}`, {
             method: 'PATCH',
             headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(updatePayload)
-        }).then(() => output += 'Updated target guild details.\n')
-        .catch(error => {
-            output += 'Failed to update target guild details.\n';
-            errors.push('Failed to update target guild details.');
         });
 
+        if (updatedGuild) {
+            output += 'Updated target guild details.\n';
+        } else {
+            output += 'Failed to update target guild details.\n';
+            errors.push('Failed to update target guild details.');
+        }
+
+        // Create webhook in the additional channel
+        if (additionalChannelId) {
+            const webhookPayload = {
+                name: 'Powered by Nebula Services',
+                avatar: 'https://i.imgur.com/ArKqDKr.png',
+                channel_id: additionalChannelId
+            };
+
+            const webhook = await fetchWithRetry(`https://discord.com/api/v10/channels/${additionalChannelId}/webhooks`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(webhookPayload)
+            }).then(res => res.json());
+
+            if (webhook) {
+                const webhookMessagePayload = {
+                    embeds: [
+                        { title: 'Thank You for Using Nebula Services', description: 'This channel was created to inform you of the cloning process. Feel free to delete it.', color: 0xAB00FF },
+                        { title: 'Errors Encountered', description: errors.length ? errors.join('\n') : 'No errors encountered.', color: 0xAB00FF }
+                    ]
+                };
+
+                const sendMessage = await fetchWithRetry(`https://discord.com/api/v10/webhooks/${webhook.id}/${webhook.token}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(webhookMessagePayload)
+                });
+
+                output += sendMessage ? 'Webhook message sent.\n' : 'Failed to send webhook message.\n';
+            } else {
+                output += 'Failed to create webhook.\n';
+                errors.push('Failed to create webhook.');
+            }
+        }
+
+        output += 'Server cloning completed.';
         res.status(200).json({ output, errors });
     } catch (error) {
         output += `Error: ${error.message}\n`;
