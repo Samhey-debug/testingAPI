@@ -1,15 +1,15 @@
 {
-  "name": "discord-cloner",
+  "name": "testingAPI",
   "version": "1.0.0",
-  "description": "A Discord server cloning service using Vercel.",
-  "main": "index.js",
-  "dependencies": {
-    "node-fetch": "^2.6.1"
-  },
-  "devDependencies": {},
+  "description": "A Netlify project with a serverless function to clone Discord guilds",
+  "main": "netlify/functions/clone-server.js",
   "scripts": {
-    "start": "vercel dev"
+    "start": "netlify dev"
   },
-  "author": "p61s",
-  "license": "MIT"
+  "dependencies": {
+    "node-fetch": "^3.3.1"
+  },
+  "engines": {
+    "node": "16.x"
+  }
 }
