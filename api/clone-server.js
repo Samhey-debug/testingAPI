@@ -1,69 +1,135 @@
 const fetch = require('node-fetch');
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const fetchWithRetry = async (url, options, maxRetries = 3) => {
     let retries = 0;
+    let response;
     while (retries < maxRetries) {
         try {
-            const response = await fetch(url, options);
+            response = await fetch(url, options);
             if (response.ok) return response;
             throw new Error(`HTTP error ${response.status}`);
         } catch (error) {
             console.error(`Attempt ${retries + 1} failed: ${error.message}`);
             retries++;
-            await sleep(1000);
+            await sleep(1);
         }
     }
     console.warn(`Max retries reached for ${url}`);
     return null;
 };
 
+const createChannelsInBatches = async (channels, targetGuildId, token, batchSize = 10) => {
+    const output = [];
+    const errors = [];
+    for (let i = 0; i < channels.length; i += batchSize) {
+        const batch = channels.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (channel) => {
+            let payload = {
+                name: channel.name,
+                type: channel.type,
+                position: channel.position,
+                parent_id: channel.parent_id,
+                topic: channel.topic || null,
+                nsfw: channel.nsfw || false,
+                bitrate: channel.bitrate || 64000,
+                user_limit: channel.user_limit || 0,
+                rate_limit_per_user: channel.rate_limit_per_user || 0,
+                permission_overwrites: channel.permission_overwrites || []
+            };
+
+            if (channel.type === 5) { // Forum channel
+                payload = { ...payload, type: 5, available_tags: channel.available_tags || [], default_sort_order: channel.default_sort_order || 0 };
+            } else if (channel.type === 13) { // Stage channel
+                payload = { ...payload, type: 13, bitrate: channel.bitrate || 64000, user_limit: channel.user_limit || 0 };
+            } else if (channel.type === 10) { // Announcement channel
+                payload = { ...payload, type: 10, nsfw: channel.nsfw || false };
+            }
+
+            const createdChannelResponse = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bot ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (createdChannelResponse) {
+                const createdChannel = await createdChannelResponse.json();
+                output.push(`Created channel: ${createdChannel.name}`);
+            } else {
+                output.push(`Failed to create channel: ${channel.name}`);
+                errors.push(`Failed to create channel: ${channel.name}`);
+            }
+        }));
+        await sleep(1); // Ensure we respect rate limits by waiting between batches
+    }
+    return { output, errors };
+};
+
 module.exports = async (req, res) => {
     const { token, sourceGuildId, targetGuildId } = req.query;
-    let output = '', errors = [];
-    
+    let output = '';
+    let errors = [];
+
     try {
-        const fetchData = async (endpoint) =>
-            fetchWithRetry(`https://discord.com/api/v10${endpoint}`, {
-                headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' }
-            }).then(res => res.json());
+        // Fetch source guild channels
+        let response = await fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}/channels`, {
+            headers: {
+                'Authorization': `Bot ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
 
-        const [sourceChannels, targetChannels, sourceRoles, targetRoles] = await Promise.all([
-            fetchData(`/guilds/${sourceGuildId}/channels`),
-            fetchData(`/guilds/${targetGuildId}/channels`),
-            fetchData(`/guilds/${sourceGuildId}/roles`),
-            fetchData(`/guilds/${targetGuildId}/roles`)
-        ]);
+        if (!response) throw new Error('Failed to fetch source guild channels');
+        const sourceChannels = await response.json();
+        output += `Fetched ${sourceChannels.length} channels from source guild.\n`;
 
-        output += `Fetched ${sourceChannels.length} source and ${targetChannels.length} target channels.\n`;
-        output += `Fetched ${sourceRoles.length} source and ${targetRoles.length} target roles.\n`;
+        // Fetch target guild channels
+        response = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
+            headers: {
+                'Authorization': `Bot ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
 
-        // Delete target channels and roles
-        await Promise.all([
-            ...targetChannels.map(channel =>
-                fetchWithRetry(`https://discord.com/api/v10/channels/${channel.id}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bot ${token}` }
-                }).then(() => output += `Deleted channel: ${channel.name}\n`)
-            ),
-            ...targetRoles.filter(role => role.name !== '@everyone').map(role =>
-                fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles/${role.id}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bot ${token}` }
-                }).then(() => output += `Deleted role: ${role.name}\n`)
-            )
-        ]);
+        if (!response) throw new Error('Failed to fetch target guild channels');
+        const targetChannels = await response.json();
+        output += `Fetched ${targetChannels.length} channels from target guild.\n`;
 
-        // Create additional channel
-        const additionalChannel = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
+        // Delete all channels in target guild
+        for (let targetChannel of targetChannels) {
+            await fetchWithRetry(`https://discord.com/api/v10/channels/${targetChannel.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bot ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            output += `Deleted channel: ${targetChannel.name}\n`;
+        }
+
+        // Create an additional channel at the top
+        const additionalPayload = {
+            name: "Copied with Nebula Services",
+            type: 0,
+            position: 0
+        };
+
+        const additionalChannelResponse = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
             method: 'POST',
-            headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: "Copied with Nebula Services", type: 0, position: 0 })
-        }).then(res => res.json());
-        
+            headers: {
+                'Authorization': `Bot ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(additionalPayload)
+        });
+
         let additionalChannelId;
-        if (additionalChannel) {
+        if (additionalChannelResponse) {
+            const additionalChannel = await additionalChannelResponse.json();
             additionalChannelId = additionalChannel.id;
             output += `Created additional channel: ${additionalChannel.name}\n`;
         } else {
@@ -71,72 +137,156 @@ module.exports = async (req, res) => {
             errors.push('Failed to create additional channel.');
         }
 
+        // Create categories first
         const categoryMap = {};
-        const createChannel = async (channel) => {
-            const payload = { ...channel, parent_id: categoryMap[channel.parent_id] || null };
-            if (channel.type === 4) { // Category
-                const createdCategory = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
+        for (let sourceChannel of sourceChannels) {
+            if (sourceChannel.type === 4) { // Category
+                let payload = {
+                    name: sourceChannel.name,
+                    type: sourceChannel.type,
+                    position: sourceChannel.position,
+                    permission_overwrites: sourceChannel.permission_overwrites
+                };
+
+                const createdCategoryResponse = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
+                    headers: {
+                        'Authorization': `Bot ${token}`,
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify(payload)
-                }).then(res => res.json());
-                if (createdCategory) {
-                    categoryMap[channel.id] = createdCategory.id;
+                });
+
+                if (createdCategoryResponse) {
+                    const createdCategory = await createdCategoryResponse.json();
+                    categoryMap[sourceChannel.id] = createdCategory.id;
                     output += `Created category: ${createdCategory.name}\n`;
+                } else {
+                    output += `Failed to create category: ${sourceChannel.name}\n`;
+                    errors.push(`Failed to create category: ${sourceChannel.name}`);
                 }
-            } else { // Other channels
-                const createdChannel = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                }).then(res => res.json());
-                if (createdChannel) output += `Created channel: ${createdChannel.name}\n`;
+
+                await sleep(1); // 1.5-second cooldown
             }
-        };
+        }
 
-        await Promise.all(sourceChannels.map(createChannel));
+        // Create non-category channels in batches
+        const nonCategoryChannels = sourceChannels.filter(channel => channel.type !== 4);
+        const { output: channelOutput, errors: channelErrors } = await createChannelsInBatches(nonCategoryChannels, targetGuildId, token, 10);
+        output += channelOutput.join('\n');
+        errors = errors.concat(channelErrors);
 
-        // Create roles
-        await Promise.all(sourceRoles.filter(role => role.name !== '@everyone').map(role =>
-            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(role)
-            }).then(res => res.json())
-            .then(createdRole => output += `Created role: ${createdRole.name}\n`)
-            .catch(() => {
-                output += `Failed to create role: ${role.name}\n`;
-                errors.push(`Failed to create role: ${role.name}`);
-            })
-        ));
+        // Fetch source guild roles
+        response = await fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}/roles`, {
+            headers: {
+                'Authorization': `Bot ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response) throw new Error('Failed to fetch source guild roles');
+        const sourceRoles = await response.json();
+        output += `Fetched ${sourceRoles.length} roles from source guild.\n`;
+
+        // Fetch target guild roles
+        response = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles`, {
+            headers: {
+                'Authorization': `Bot ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response) throw new Error('Failed to fetch target guild roles');
+        const targetRoles = await response.json();
+        output += `Fetched ${targetRoles.length} roles from target guild.\n`;
+
+        // Delete all roles in target guild except @everyone
+        for (let targetRole of targetRoles) {
+            if (targetRole.name !== '@everyone') {
+                await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles/${targetRole.id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bot ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                output += `Deleted role: ${targetRole.name}\n`;
+            }
+        }
+
+        // Create roles in target guild
+        for (let sourceRole of sourceRoles) {
+            if (sourceRole.name !== '@everyone') {
+                let payload = {
+                    name: sourceRole.name,
+                    color: sourceRole.color,
+                    hoist: sourceRole.hoist,
+                    position: sourceRole.position,
+                    permissions: sourceRole.permissions,
+                    managed: sourceRole.managed,
+                    mentionable: sourceRole.mentionable
+                };
+
+                const createdRoleResponse = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bot ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (createdRoleResponse) {
+                    const createdRole = await createdRoleResponse.json();
+                    output += `Created role: ${createdRole.name}\n`;
+                } else {
+                    output += `Failed to create role: ${sourceRole.name}\n`;
+                    errors.push(`Failed to create role: ${sourceRole.name}`);
+                }
+
+                await sleep(1); // 1.5-second cooldown
+            }
+        }
+
+        // Fetch source guild details
+        response = await fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}`, {
+            headers: {
+                'Authorization': `Bot ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response) throw new Error('Failed to fetch source guild details');
+        const sourceGuild = await response.json();
+        output += `Fetched source guild details.\n`;
 
         // Update target guild details
-        const sourceGuild = await fetchWithRetry(`/guilds/${sourceGuildId}`, {
-            headers: { 'Authorization': `Bot ${token}` }
-        }).then(res => res.json());
-
-        const updatePayload = {
+        let updatePayload = {
             name: sourceGuild.name,
             icon: sourceGuild.icon ? `https://cdn.discordapp.com/icons/${sourceGuild.id}/${sourceGuild.icon}.png` : null,
             verification_level: sourceGuild.verification_level,
             default_message_notifications: sourceGuild.default_message_notifications,
-            explicit_content_filter: sourceGuild.explicit_content_filter
+            explicit_content_filter: sourceGuild.explicit_content_filter,
+            system_channel_id: null
         };
 
-        const updatedGuild = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}`, {
+        const updateGuildResponse = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}`, {
             method: 'PATCH',
-            headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
+            headers: {
+                'Authorization': `Bot ${token}`,
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify(updatePayload)
         });
 
-        if (updatedGuild) {
+        if (updateGuildResponse) {
             output += 'Updated target guild details.\n';
         } else {
             output += 'Failed to update target guild details.\n';
             errors.push('Failed to update target guild details.');
         }
 
-        // Create webhook in the additional channel
+        // Create a webhook in the special channel
         if (additionalChannelId) {
             const webhookPayload = {
                 name: 'Powered by Nebula Services',
@@ -144,27 +294,45 @@ module.exports = async (req, res) => {
                 channel_id: additionalChannelId
             };
 
-            const webhook = await fetchWithRetry(`https://discord.com/api/v10/channels/${additionalChannelId}/webhooks`, {
+            const createWebhookResponse = await fetchWithRetry(`https://discord.com/api/v10/channels/${additionalChannelId}/webhooks`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
+                headers: {
+                    'Authorization': `Bot ${token}`,
+                    'Content-Type': 'application/json'
+                },
                 body: JSON.stringify(webhookPayload)
-            }).then(res => res.json());
+            });
 
-            if (webhook) {
+            if (createWebhookResponse) {
+                const webhook = await createWebhookResponse.json();
+                output += `Created webhook in special channel.\n`;
+
+                // Prepare the embeds
                 const webhookMessagePayload = {
                     embeds: [
-                        { title: 'Thank You for Using Nebula Services', description: 'This channel was created to inform you of the cloning process. Feel free to delete it.', color: 0xAB00FF },
-                        { title: 'Errors Encountered', description: errors.length ? errors.join('\n') : 'No errors encountered.', color: 0xAB00FF }
+                        {
+                            title: 'Thank You for Using Nebula Services',
+                            description: 'This channel was created to inform you of the cloning process. Feel free to delete it.',
+                            color: 0xAB00FF
+                        },
+                        {
+                            title: 'Errors Encountered',
+                            description: errors.length > 0 ? errors.join('\n') : 'No errors encountered during the cloning process.',
+                            color: 0xAB00FF
+                        }
                     ]
                 };
 
-                const sendMessage = await fetchWithRetry(`https://discord.com/api/v10/webhooks/${webhook.id}/${webhook.token}`, {
+                // Send a message via the webhook
+                await fetchWithRetry(`https://discord.com/api/v10/webhooks/${webhook.id}/${webhook.token}`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify(webhookMessagePayload)
                 });
 
-                output += sendMessage ? 'Webhook message sent.\n' : 'Failed to send webhook message.\n';
+                output += 'Webhook message sent.\n';
             } else {
                 output += 'Failed to create webhook.\n';
                 errors.push('Failed to create webhook.');
@@ -172,10 +340,10 @@ module.exports = async (req, res) => {
         }
 
         output += 'Server cloning completed.';
-        res.status(200).json({ output, errors });
     } catch (error) {
         output += `Error: ${error.message}\n`;
         errors.push(error.message);
-        res.status(500).json({ output, errors });
     }
+
+    res.status(200).json({ output, errors });
 };
