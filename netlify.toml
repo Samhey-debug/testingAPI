@@ -1,2 +1,7 @@
 [build]
   functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/clone"
+  to = "/.netlify/functions/clone-server"
+  status = 200
