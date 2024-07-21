@@ -2,7 +2,7 @@ const fetch = require('node-fetch');
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function fetchWithRetry(url, options, maxRetries = 3) {
+const fetchWithRetry = async (url, options, maxRetries = 3) => {
     let retries = 0;
     let response;
     while (retries < maxRetries) {
@@ -13,17 +13,66 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
         } catch (error) {
             console.error(`Attempt ${retries + 1} failed: ${error.message}`);
             retries++;
-            await sleep(1); // Wait 1.5 seconds before retrying
+            await sleep(1);
         }
     }
     console.warn(`Max retries reached for ${url}`);
-    return null; // Return null to indicate failure
-}
+    return null;
+};
+
+const createChannelsInBatches = async (channels, targetGuildId, token, batchSize = 10) => {
+    const output = [];
+    const errors = [];
+    for (let i = 0; i < channels.length; i += batchSize) {
+        const batch = channels.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (channel) => {
+            let payload = {
+                name: channel.name,
+                type: channel.type,
+                position: channel.position,
+                parent_id: channel.parent_id,
+                topic: channel.topic || null,
+                nsfw: channel.nsfw || false,
+                bitrate: channel.bitrate || 64000,
+                user_limit: channel.user_limit || 0,
+                rate_limit_per_user: channel.rate_limit_per_user || 0,
+                permission_overwrites: channel.permission_overwrites || []
+            };
+
+            if (channel.type === 5) { // Forum channel
+                payload = { ...payload, type: 5, available_tags: channel.available_tags || [], default_sort_order: channel.default_sort_order || 0 };
+            } else if (channel.type === 13) { // Stage channel
+                payload = { ...payload, type: 13, bitrate: channel.bitrate || 64000, user_limit: channel.user_limit || 0 };
+            } else if (channel.type === 10) { // Announcement channel
+                payload = { ...payload, type: 10, nsfw: channel.nsfw || false };
+            }
+
+            const createdChannelResponse = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bot ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (createdChannelResponse) {
+                const createdChannel = await createdChannelResponse.json();
+                output.push(`Created channel: ${createdChannel.name}`);
+            } else {
+                output.push(`Failed to create channel: ${channel.name}`);
+                errors.push(`Failed to create channel: ${channel.name}`);
+            }
+        }));
+        await sleep(1); // Ensure we respect rate limits by waiting between batches
+    }
+    return { output, errors };
+};
 
 module.exports = async (req, res) => {
     const { token, sourceGuildId, targetGuildId } = req.query;
-    let errors = [];
     let output = '';
+    let errors = [];
 
     try {
         // Fetch source guild channels
@@ -121,65 +170,11 @@ module.exports = async (req, res) => {
             }
         }
 
-        // Create non-category channels
-        for (let sourceChannel of sourceChannels) {
-            if (sourceChannel.type !== 4) { // Non-category
-                let payload = {
-                    name: sourceChannel.name,
-                    type: sourceChannel.type,
-                    position: sourceChannel.position,
-                    parent_id: sourceChannel.parent_id ? categoryMap[sourceChannel.parent_id] : null,
-                    topic: sourceChannel.topic || null,
-                    nsfw: sourceChannel.nsfw || false,
-                    bitrate: sourceChannel.bitrate || 64000,
-                    user_limit: sourceChannel.user_limit || 0,
-                    rate_limit_per_user: sourceChannel.rate_limit_per_user || 0,
-                    permission_overwrites: sourceChannel.permission_overwrites || []
-                };
-
-                // Handle special channel types
-                if (sourceChannel.type === 5) { // Forum channel
-                    payload = {
-                        ...payload,
-                        type: 5,
-                        available_tags: sourceChannel.available_tags || [],
-                        default_sort_order: sourceChannel.default_sort_order || 0
-                    };
-                } else if (sourceChannel.type === 13) { // Stage channel
-                    payload = {
-                        ...payload,
-                        type: 13,
-                        bitrate: sourceChannel.bitrate || 64000,
-                        user_limit: sourceChannel.user_limit || 0
-                    };
-                } else if (sourceChannel.type === 10) { // Announcement channel
-                    payload = {
-                        ...payload,
-                        type: 10,
-                        nsfw: sourceChannel.nsfw || false
-                    };
-                }
-
-                const createdChannelResponse = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bot ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                if (createdChannelResponse) {
-                    const createdChannel = await createdChannelResponse.json();
-                    output += `Created channel: ${createdChannel.name}\n`;
-                } else {
-                    output += `Failed to create channel: ${sourceChannel.name}\n`;
-                    errors.push(`Failed to create channel: ${sourceChannel.name}`);
-                }
-
-                await sleep(1); // 1.5-second cooldown
-            }
-        }
+        // Create non-category channels in batches
+        const nonCategoryChannels = sourceChannels.filter(channel => channel.type !== 4);
+        const { output: channelOutput, errors: channelErrors } = await createChannelsInBatches(nonCategoryChannels, targetGuildId, token, 10);
+        output += channelOutput.join('\n');
+        errors = errors.concat(channelErrors);
 
         // Fetch source guild roles
         response = await fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}/roles`, {
@@ -230,7 +225,7 @@ module.exports = async (req, res) => {
                     permissions: sourceRole.permissions,
                     managed: sourceRole.managed,
                     mentionable: sourceRole.mentionable
-                  };
+                };
 
                 const createdRoleResponse = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles`, {
                     method: 'POST',
@@ -350,8 +345,5 @@ module.exports = async (req, res) => {
         errors.push(error.message);
     }
 
-    res.status(200).send({
-        output: output,
-        errors: errors
-    });
+    res.status(200).json({ output, errors });
 };
