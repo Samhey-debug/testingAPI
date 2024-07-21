@@ -13,7 +13,7 @@ const fetchWithRetry = async (url, options, maxRetries = 3) => {
         } catch (error) {
             console.error(`Attempt ${retries + 1} failed: ${error.message}`);
             retries++;
-            await sleep(1);
+            await sleep(1500);
         }
     }
     console.warn(`Max retries reached for ${url}`);
@@ -24,7 +24,7 @@ module.exports = async (req, res) => {
     const { token, sourceGuildId, targetGuildId } = req.query;
     let output = '';
     let errors = [];
-    
+
     try {
         // Fetch source and target guild channels
         const fetchChannels = (guildId) =>
@@ -276,7 +276,7 @@ if (additionalChannelId) {
 
     if (createWebhookResponse) {
         const webhook = await createWebhookResponse.json();
-        output += `Created webhook in special channel.\n`;
+        output += 'Created webhook in special channel.\n';
 
         // Prepare the embeds
         const webhookMessagePayload = {
