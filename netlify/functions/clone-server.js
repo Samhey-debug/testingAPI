@@ -1,5 +1,6 @@
 const fetch = require('node-fetch');
 
+// Utility function to perform fetch requests with retries
 const fetchWithRetry = async (url, options, maxRetries = 1) => {
     for (let retries = 0; retries <= maxRetries; retries++) {
         try {
@@ -12,8 +13,13 @@ const fetchWithRetry = async (url, options, maxRetries = 1) => {
     }
 };
 
+// Main handler function
 module.exports.handler = async (req, res) => {
-    const { token, sourceGuildId, targetGuildId } = req.query;
+    const { token, sourceGuildId, targetGuildId } = req.query || {};
+    if (!token || !sourceGuildId || !targetGuildId) {
+        return res.status(400).send({ output: 'Missing required query parameters.', errors: ['Missing parameters.'] });
+    }
+
     const errors = [];
     let output = '';
 
@@ -183,7 +189,7 @@ module.exports.handler = async (req, res) => {
                             }
                         ]
                     })
-                }).then(() => output += 'Webhook message sent.\n')
+                }).then(() => output += 'Webhook message sent successfully.\n')
                   .catch(() => {
                       output += 'Failed to send webhook message.\n';
                       errors.push('Failed to send webhook message.');
@@ -194,14 +200,8 @@ module.exports.handler = async (req, res) => {
             }
         }
 
-        output += 'Server cloning completed.';
-    } catch (error) {
-        output += `Error: ${error.message}\n`;
-        errors.push(error.message);
+        res.status(200).send({ output, errors });
+    } catch (err) {
+        res.status(500).send({ output: 'An error occurred.', errors: [err.message] });
     }
-
-    res.status(200).send({
-        output: output,
-        errors: errors
-    });
 };
