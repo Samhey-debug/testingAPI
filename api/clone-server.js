@@ -13,7 +13,7 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
         } catch (error) {
             console.error(`Attempt ${retries + 1} failed: ${error.message}`);
             retries++;
-            await sleep(1500); // Wait 1.5 seconds before retrying
+            await sleep(1); // Wait 1.5 seconds before retrying
         }
     }
     console.warn(`Max retries reached for ${url}`);
@@ -117,7 +117,7 @@ module.exports = async (req, res) => {
                     errors.push(`Failed to create category: ${sourceChannel.name}`);
                 }
 
-                await sleep(1500); // 1.5-second cooldown
+                await sleep(1); // 1.5-second cooldown
             }
         }
 
@@ -177,7 +177,7 @@ module.exports = async (req, res) => {
                     errors.push(`Failed to create channel: ${sourceChannel.name}`);
                 }
 
-                await sleep(1500); // 1.5-second cooldown
+                await sleep(1); // 1.5-second cooldown
             }
         }
 
@@ -249,7 +249,7 @@ module.exports = async (req, res) => {
                     errors.push(`Failed to create role: ${sourceRole.name}`);
                 }
 
-                await sleep(1500); // 1.5-second cooldown
+                await sleep(1); // 1.5-second cooldown
             }
         }
 
