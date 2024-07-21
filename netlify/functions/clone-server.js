@@ -14,10 +14,13 @@ const fetchWithRetry = async (url, options, maxRetries = 1) => {
 };
 
 // Main handler function
-module.exports.handler = async (req, res) => {
-    const { token, sourceGuildId, targetGuildId } = req.query || {};
+module.exports.handler = async (event) => {
+    const { token, sourceGuildId, targetGuildId } = event.queryStringParameters || {};
     if (!token || !sourceGuildId || !targetGuildId) {
-        return res.status(400).send({ output: 'Missing required query parameters.', errors: ['Missing parameters.'] });
+        return {
+            statusCode: 400,
+            body: JSON.stringify({ output: 'Missing required query parameters.', errors: ['Missing parameters.'] })
+        };
     }
 
     const errors = [];
@@ -200,8 +203,14 @@ module.exports.handler = async (req, res) => {
             }
         }
 
-        res.status(200).send({ output, errors });
+        return {
+            statusCode: 200,
+            body: JSON.stringify({ output, errors })
+        };
     } catch (err) {
-        res.status(500).send({ output: 'An error occurred.', errors: [err.message] });
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ output: 'An error occurred.', errors: [err.message] })
+        };
     }
 };
