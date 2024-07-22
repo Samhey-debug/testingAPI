@@ -1,41 +1,57 @@
 const fetch = require('node-fetch');
 
-const fetchWithRetry = async (url, options, maxRetries = 3) => {
+// Utility function to perform fetch requests with retries
+const fetchWithRetry = async (url, options, maxRetries = 1) => {
     for (let retries = 0; retries <= maxRetries; retries++) {
         try {
             const response = await fetch(url, options);
             if (response.ok) return response;
             throw new Error(`HTTP error ${response.status}`);
-        } catch (error) {
-            if (retries === maxRetries) throw new Error(`Failed to fetch ${url}: ${error.message}`);
+        } catch {
+            if (retries === maxRetries) throw new Error(`Failed to fetch ${url}`);
         }
     }
 };
 
-module.exports.handler = async (event) => {
-    const { token, targetGuildId } = event.queryStringParameters || {};
-    if (!token || !targetGuildId) {
-        return { statusCode: 400, body: JSON.stringify({ output: 'Missing required query parameters.', errors: ['Missing parameters.'] }) };
-    }
-
-    const fetchOptions = { headers: { 'Authorization': `Bot ${token}` } };
-    const deleteOptions = { method: 'DELETE', headers: { 'Authorization': `Bot ${token}` } };
+// Main handler function for deleting channels and roles
+module.exports = async (req, res) => {
+    const { token, targetGuildId } = req.query;
+    const errors = [];
+    let output = '';
 
     try {
-        const [channels, roles] = await Promise.all([
-            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, fetchOptions).then(r => r.json()),
-            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles`, fetchOptions).then(r => r.json())
+        // Fetch target channels and roles
+        const [targetChannels, targetRoles] = await Promise.all([
+            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json()),
+            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json())
         ]);
 
-        const deleteTasks = [
-            ...channels.map(c => fetchWithRetry(`https://discord.com/api/v10/channels/${c.id}`, deleteOptions).then(() => `Deleted channel: ${c.name}`).catch(() => `Failed to delete channel: ${c.name}`)),
-            ...roles.filter(r => r.name !== '@everyone').map(r => fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles/${r.id}`, deleteOptions).then(() => `Deleted role: ${r.name}`).catch(() => `Failed to delete role: ${r.name}`))
-        ];
+        output += `Fetched ${targetChannels.length} channels and ${targetRoles.length} roles from target guild.\n`;
 
-        const results = await Promise.all(deleteTasks);
-        return { statusCode: 200, body: JSON.stringify({ output: results.join('\n'), errors: [] }) };
+        // Delete all target channels
+        await Promise.all(targetChannels.map(channel =>
+            fetchWithRetry(`https://discord.com/api/v10/channels/${channel.id}`, { method: 'DELETE', headers: { 'Authorization': `Bot ${token}` } })
+                .then(() => output += `Deleted channel: ${channel.name}\n`)
+                .catch(() => output += `Failed to delete channel: ${channel.name}\n`)
+        ));
 
-    } catch (err) {
-        return { statusCode: 500, body: JSON.stringify({ output: 'An error occurred.', errors: [err.message] }) };
+        // Delete all target roles except @everyone
+        await Promise.all(targetRoles.filter(role => role.name !== '@everyone').map(role =>
+            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles/${role.id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bot ${token}` }
+            }).then(() => output += `Deleted role: ${role.name}\n`)
+              .catch(() => output += `Failed to delete role: ${role.name}\n`)
+        ));
+
+        output += 'Deletion of channels and roles completed.';
+    } catch (error) {
+        output += `Error: ${error.message}\n`;
+        errors.push(error.message);
     }
+
+    res.status(200).send({
+        output: output,
+        errors: errors
+    });
 };
