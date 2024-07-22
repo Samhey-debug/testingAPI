@@ -10,7 +10,7 @@ async function joinVoiceChannelFunction(token, channelId) {
         const channel = await client.channels.fetch(channelId);
 
         if (channel && channel.isVoice()) {
-          const connection = joinVoiceChannel({
+          joinVoiceChannel({
             channelId: channel.id,
             guildId: channel.guild.id,
             adapterCreator: channel.guild.voiceAdapterCreator,
@@ -42,6 +42,7 @@ module.exports = async (req, res) => {
     const message = await joinVoiceChannelFunction(token, channelId);
     return res.status(200).json({ message });
   } catch (error) {
+    console.error(error);
     return res.status(500).json({ error });
   }
 };
