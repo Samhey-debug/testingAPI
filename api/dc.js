@@ -1,4 +1,5 @@
 const fetch = require('node-fetch');
+
 const fetchWithRetry = async (url, options, maxRetries = 3) => {
     for (let retries = 0; retries <= maxRetries; retries++) {
         try {
@@ -13,44 +14,25 @@ const fetchWithRetry = async (url, options, maxRetries = 3) => {
 
 module.exports.handler = async (event) => {
     const { token, targetGuildId } = event.queryStringParameters || {};
-    if (!token || !targetGuildId) {
-        return {
-            statusCode: 400,
-            body: JSON.stringify({ output: 'Missing required query parameters.', errors: ['Missing parameters.'] })
-        };
-    }
+    if (!token || !targetGuildId) return { statusCode: 400, body: JSON.stringify({ output: 'Missing required query parameters.', errors: ['Missing parameters.'] }) };
 
-    const errors = [];
-    let output = '';
+    const fetchOptions = { headers: { 'Authorization': `Bot ${token}` } };
+    const fetchJson = url => fetchWithRetry(url, fetchOptions).then(r => r.json());
+    const delOptions = id => ({ method: 'DELETE', headers: { 'Authorization': `Bot ${token}` } });
 
     try {
-        const [targetChannels, targetRoles] = await Promise.all([
-            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json()),
-            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json())
+        const [channels, roles] = await Promise.all([
+            fetchJson(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`),
+            fetchJson(`https://discord.com/api/v10/guilds/${targetGuildId}/roles`)
         ]);
 
-        await Promise.all(targetChannels.map(channel =>
-            fetchWithRetry(`https://discord.com/api/v10/channels/${channel.id}`, { method: 'DELETE', headers: { 'Authorization': `Bot ${token}` } })
-                .then(() => output += `Deleted channel: ${channel.name}\n`)
-                .catch(() => output += `Failed to delete channel: ${channel.name}\n`)
-        ));
+        const results = await Promise.all([
+            ...channels.map(c => fetchWithRetry(`https://discord.com/api/v10/channels/${c.id}`, delOptions()).then(() => `Deleted channel: ${c.name}\n`).catch(() => `Failed to delete channel: ${c.name}\n`)),
+            ...roles.filter(r => r.name !== '@everyone').map(r => fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles/${r.id}`, delOptions()).then(() => `Deleted role: ${r.name}\n`).catch(() => `Failed to delete role: ${r.name}\n`))
+        ]);
 
-        await Promise.all(targetRoles.filter(role => role.name !== '@everyone').map(role =>
-            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles/${role.id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bot ${token}` }
-            }).then(() => output += `Deleted role: ${role.name}\n`)
-              .catch(() => output += `Failed to delete role: ${role.name}\n`)
-        ));
-
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ output, errors })
-        };
+        return { statusCode: 200, body: JSON.stringify({ output: results.join(''), errors: [] }) };
     } catch (err) {
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ output: 'An error occurred.', errors: [err.message] })
-        };
+        return { statusCode: 500, body: JSON.stringify({ output: 'An error occurred.', errors: [err.message] }) };
     }
 };
