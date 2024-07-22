@@ -1,5 +1,5 @@
 const { Client, Intents } = require('discord.js');
-const { joinVoiceChannel, entersState, VoiceConnectionStatus } = require('@discordjs/voice');
+const { joinVoiceChannel, entersState, VoiceConnectionStatus, createAudioPlayer, createAudioResource, AudioPlayerStatus } = require('@discordjs/voice');
 
 async function joinVoiceChannelFunction(token, channelId) {
   const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_VOICE_STATES] });
@@ -11,11 +11,34 @@ async function joinVoiceChannelFunction(token, channelId) {
 
         if (channel && channel.isVoice()) {
           console.log(`Attempting to join voice channel: ${channel.name}`);
-          
+
           const connection = joinVoiceChannel({
             channelId: channel.id,
             guildId: channel.guild.id,
             adapterCreator: channel.guild.voiceAdapterCreator,
+          });
+
+          // Create an audio player and resource to keep the bot active
+          const player = createAudioPlayer();
+          const resource = createAudioResource('path/to/silence.mp3'); // Use a silence or low-volume audio file
+
+          player.play(resource);
+          connection.subscribe(player);
+
+          player.on(AudioPlayerStatus.Playing, () => {
+            console.log('The audio player has started playing!');
+          });
+
+          player.on('error', error => {
+            console.error(`Error: ${error.message} with resource ${error.resource.metadata.title}`);
+          });
+
+          connection.on(VoiceConnectionStatus.Disconnected, () => {
+            console.log('Disconnected from the voice channel, attempting to reconnect...');
+            entersState(connection, VoiceConnectionStatus.Connecting, 5_000).catch(() => {
+              console.log('Failed to reconnect, destroying the connection.');
+              connection.destroy();
+            });
           });
 
           try {
