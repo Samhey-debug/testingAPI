@@ -20,8 +20,8 @@
       "src": "/api/vc",
       "dest": "/api/vc.js"
     }, {
-      "src": "/api/dc",
-      "dest": "/api/dc.js"
+      "src": "/api/cs",
+      "dest": "/api/cs.js"
     }
     
   ]
