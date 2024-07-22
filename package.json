@@ -6,7 +6,11 @@
   "dependencies": {
     "node-fetch": "^2.6.1",
     "discord.js": "^13.0.0",
-    "@discordjs/voice": "^0.7.0"
+    "@discordjs/voice": "^0.7.0",
+    "ytdl-core": "^4.9.1"
+  },
+  "engines": {
+    "node": ">=16.6.0"
   },
   "devDependencies": {},
   "scripts": {
