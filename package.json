@@ -4,7 +4,8 @@
   "description": "A Discord server cloning service using Vercel.",
   "main": "index.js",
   "dependencies": {
-    "node-fetch": "^2.6.1"
+    "node-fetch": "^2.6.1",
+    "discord.js": "^13.0.0"
   },
   "devDependencies": {},
   "scripts": {
