@@ -31,13 +31,13 @@ module.exports = async (req, res) => {
 
         // Fetch source and target channels in parallel
         const [sourceChannels, targetChannels] = await Promise.all([
-            fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}/channels`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json()).catch(() => []),
-            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json()).catch(() => [])
+            fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}/channels`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json()),
+            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json())
         ]);
 
         output += `Fetched ${sourceChannels.length} channels from source and ${targetChannels.length} from target.\n`;
 
-        // Delete all target channels
+        // Delete all target channels in parallel
         await Promise.all(targetChannels.map(channel =>
             fetchWithRetry(`https://discord.com/api/v10/channels/${channel.id}`, { method: 'DELETE', headers: { 'Authorization': `Bot ${token}` } })
                 .then(() => output += `Deleted channel: ${channel.name}\n`)
@@ -55,7 +55,7 @@ module.exports = async (req, res) => {
             output += `Created additional channel: ${additionalChannel.name}\n`;
             const additionalChannelId = additionalChannel.id;
 
-            // Create webhook in additional channel
+            // Create webhook in additional channel immediately
             const webhook = await fetchWithRetry(`https://discord.com/api/v10/channels/${additionalChannelId}/webhooks`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
@@ -69,8 +69,16 @@ module.exports = async (req, res) => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         embeds: [
-                            { title: 'Thank You for Using Nebula Services', description: 'This channel was created to inform you of the cloning process. Feel free to delete it.', color: 0xAB00FF },
-                            { title: 'Sorry!', description: 'We are truly sorry if the whole source server couldn\'t be copied!', color: 0xFF0000 }
+                            {
+                                title: 'Thank You for Using Nebula Services',
+                                description: 'This channel was created to inform you of the cloning process. Feel free to delete it.',
+                                color: 0xAB00FF
+                            },
+                            {
+                                title: 'Sorry!',
+                                description: 'We are truly sorry if the whole source server couldn\'t be copied!',
+                                color: 0xFF0000
+                            }
                         ]
                     })
                 }).then(() => output += 'Webhook message sent.\n')
@@ -87,11 +95,11 @@ module.exports = async (req, res) => {
             errors.push('Failed to create additional channel.');
         }
 
-        // Create categories and channels
+        // Create categories first
         const categoryMap = {};
         await Promise.all(sourceChannels
             .filter(channel => channel.type === 4) // Category
-            .map(channel =>
+            .map(channel => 
                 fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
@@ -113,6 +121,7 @@ module.exports = async (req, res) => {
             )
         );
 
+        // Create non-category channels
         await Promise.all(sourceChannels
             .filter(channel => channel.type !== 4) // Non-category
             .map(channel => {
@@ -138,8 +147,8 @@ module.exports = async (req, res) => {
                     body: JSON.stringify(payload)
                 }).then(r => r.json())
                   .then(createdChannel => output += `Created channel: ${createdChannel.name}\n`)
-                  .catch(() => {
-                      output += `Failed to create channel: ${channel.name}\n`;
+                  .catch(err => {
+                      output += `Failed to create channel: ${channel.name}. Error: ${err.message}\n`;
                       errors.push(`Failed to create channel: ${channel.name}`);
                   });
             })
@@ -147,12 +156,13 @@ module.exports = async (req, res) => {
 
         // Fetch and handle roles
         const [sourceRoles, targetRoles] = await Promise.all([
-            fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}/roles`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json()).catch(() => []),
-            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json()).catch(() => [])
+            fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}/roles`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json()),
+            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json())
         ]);
 
         output += `Fetched ${sourceRoles.length} roles from source and ${targetRoles.length} from target.\n`;
 
+        // Delete target roles in parallel
         await Promise.all(targetRoles.filter(role => role.name !== '@everyone').map(role =>
             fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles/${role.id}`, {
                 method: 'DELETE',
@@ -161,6 +171,7 @@ module.exports = async (req, res) => {
               .catch(() => output += `Failed to delete role: ${role.name}\n`)
         ));
 
+        // Create roles in parallel
         await Promise.all(sourceRoles.filter(role => role.name !== '@everyone').map(role =>
             fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles`, {
                 method: 'POST',
@@ -183,60 +194,41 @@ module.exports = async (req, res) => {
         ));
 
         // Update guild details
-        if (targetGuild) {
+        const sourceGuild = await fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}`, {
+            headers: { 'Authorization': `Bot ${token}` }
+        }).then(r => r.json()).catch(() => null);
+
+        if (sourceGuild) {
             const updatePayload = {
-                name: targetGuild.name,
-                icon: targetGuild.icon ? `https://cdn.discordapp.com/icons/${targetGuild.id}/${targetGuildicon}.png` : null,
-                verification_level: targetGuild.verification_level,
-                default_message_notifications: targetGuild.default_message_notifications,
-                explicit_content_filter: targetGuild.explicit_content_filter
+                name: sourceGuild.name,
+                icon: sourceGuild.icon ? `https://cdn.discordapp.com/icons/${sourceGuild.id}/${sourceGuild.icon}.png` : null,
+                verification_level: sourceGuild.verification_level,
+                default_message_notifications: sourceGuild.default_message_notifications,
+                explicit_content_filter: sourceGuild.explicit_content_filter
             };
 
             await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify(updatePayload)
-            }).then(() => output += 'Updated target guild details.\n')
+            }).then(() => output += 'Updated guild details.\n')
               .catch(() => {
-                  output += 'Failed to update target guild details.\n';
-                  errors.push('Failed to update target guild details.');
+                  output += 'Failed to update guild details.\n';
+                  errors.push('Failed to update guild details.');
               });
+        } else {
+            output += 'Failed to fetch source guild details.\n';
+            errors.push('Failed to fetch source guild details.');
         }
 
-        // Send final webhook message with errors
-        if (additionalChannelId) {
-            const finalWebhook = await fetchWithRetry(`https://discord.com/api/v10/channels/${additionalChannelId}/webhooks`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: 'Powered by Nebula Services', avatar: 'https://i.imgur.com/ArKqDKr.png', channel_id: additionalChannelId })
-            }).then(r => r.json()).catch(() => null);
+        // Respond with the collected output and errors
+        res.status(200).send({
+            message: output,
+            errors: errors
+        });
 
-            if (finalWebhook) {
-                output += 'Created final webhook.\n';
-                await fetchWithRetry(`https://discord.com/api/v10/webhooks/${finalWebhook.id}/${finalWebhook.token}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        embeds: [
-                            { title: 'Errors Encountered', description: errors.length > 0 ? errors.join('\n') : 'No errors encountered.', color: 0xAB00FF }
-                        ]
-                    })
-                }).then(() => output += 'Final webhook message sent.\n')
-                  .catch(() => {
-                      output += 'Failed to send final webhook message.\n';
-                      errors.push('Failed to send final webhook message.');
-                  });
-            } else {
-                output += 'Failed to create final webhook.\n';
-                errors.push('Failed to create final webhook.');
-            }
-        }
-
-        output += 'Server cloning completed.';
     } catch (error) {
-        output += `Error: ${error.message}\n`;
-        errors.push(error.message);
+        // Catch and log any unexpected errors
+        res.status(500).send({ error: `Unexpected error occurred: ${error.message}` });
     }
-
-    res.status(200).send({ output, errors });
 };
