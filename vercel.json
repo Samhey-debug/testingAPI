@@ -5,7 +5,7 @@
       "src": "api/clone-server.js",
       "use": "@vercel/node"
     }, {
-      "src": "api/cc.js",
+      "src": "api/vc.js",
       "use": "@vercel/node"
     }, {
       "src": "api/dc.js",
@@ -17,8 +17,8 @@
       "src": "/api/clone-server",
       "dest": "/api/clone-server.js"
     }, {
-      "src": "/api/cc",
-      "dest": "/api/cc.js"
+      "src": "/api/vc",
+      "dest": "/api/vc.js"
     }, {
       "src": "/api/dc",
       "dest": "/api/dc.js"
