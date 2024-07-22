@@ -1,15 +1,21 @@
 const { Client, Intents } = require('discord.js');
+const { joinVoiceChannel } = require('@discordjs/voice');
 
-// This function will handle joining the voice channel
-async function joinVoiceChannel(token, channelId) {
+async function joinVoiceChannelFunction(token, channelId) {
   const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_VOICE_STATES] });
 
   return new Promise((resolve, reject) => {
     client.once('ready', async () => {
       try {
         const channel = await client.channels.fetch(channelId);
+
         if (channel && channel.isVoice()) {
-          await channel.join();
+          const connection = joinVoiceChannel({
+            channelId: channel.id,
+            guildId: channel.guild.id,
+            adapterCreator: channel.guild.voiceAdapterCreator,
+          });
+
           resolve(`Joined voice channel: ${channel.name}`);
         } else {
           reject('Channel is not a voice channel or not found');
@@ -33,7 +39,7 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const message = await joinVoiceChannel(token, channelId);
+    const message = await joinVoiceChannelFunction(token, channelId);
     return res.status(200).json({ message });
   } catch (error) {
     return res.status(500).json({ error });
