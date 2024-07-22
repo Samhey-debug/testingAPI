@@ -230,7 +230,7 @@ module.exports = async (req, res) => {
                             {
                                 title: 'Errors Encountered',
                                 description: errors.length > 0 ? errors.join('\n') : 'No errors encountered during the cloning process.',
-                                color: 0xFF0000
+                                color: 0xAB00FF
                             }
                         ]
                     })
