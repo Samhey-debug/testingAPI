@@ -8,7 +8,7 @@
       "src": "api/vc.js",
       "use": "@vercel/node"
     }, {
-      "src": "api/dc.js",
+      "src": "api/cs.js",
       "use": "@vercel/node"
     }
   ],
