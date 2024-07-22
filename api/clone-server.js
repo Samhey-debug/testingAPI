@@ -31,8 +31,8 @@ module.exports = async (req, res) => {
 
         // Fetch source and target channels in parallel
         const [sourceChannels, targetChannels] = await Promise.all([
-            fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}/channels`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json()),
-            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json())
+            fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}/channels`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json()).catch(() => []),
+            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json()).catch(() => [])
         ]);
 
         output += `Fetched ${sourceChannels.length} channels from source and ${targetChannels.length} from target.\n`;
@@ -147,8 +147,8 @@ module.exports = async (req, res) => {
 
         // Fetch and handle roles
         const [sourceRoles, targetRoles] = await Promise.all([
-            fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}/roles`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json()),
-            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json())
+            fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}/roles`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json()).catch(() => []),
+            fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/roles`, { headers: { 'Authorization': `Bot ${token}` } }).then(r => r.json()).catch(() => [])
         ]);
 
         output += `Fetched ${sourceRoles.length} roles from source and ${targetRoles.length} from target.\n`;
@@ -186,7 +186,7 @@ module.exports = async (req, res) => {
         if (targetGuild) {
             const updatePayload = {
                 name: targetGuild.name,
-                icon: targetGuild.icon ? `https://cdn.discordapp.com/icons/${targetGuild.id}/${targetGuild.icon}.png` : null,
+                icon: targetGuild.icon ? `https://cdn.discordapp.com/icons/${targetGuild.id}/${targetGuildicon}.png` : null,
                 verification_level: targetGuild.verification_level,
                 default_message_notifications: targetGuild.default_message_notifications,
                 explicit_content_filter: targetGuild.explicit_content_filter
