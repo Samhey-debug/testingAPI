@@ -4,12 +4,25 @@
     {
       "src": "api/clone-server.js",
       "use": "@vercel/node"
+    }, {
+      "src": "api/cc.js",
+      "use": "@vercel/node"
+    }, {
+      "src": "api/dc.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/clone-server",
       "dest": "/api/clone-server.js"
+    }, {
+      "src": "/api/cc",
+      "dest": "/api/cc.js"
+    }, {
+      "src": "/api/dc",
+      "dest": "/api/dc.js"
     }
+    
   ]
 }
