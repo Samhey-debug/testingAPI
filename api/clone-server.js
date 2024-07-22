@@ -45,6 +45,42 @@ module.exports = async (req, res) => {
         if (additionalChannel) {
             output += `Created additional channel: ${additionalChannel.name}\n`;
             var additionalChannelId = additionalChannel.id;
+
+            // Create webhook in additional channel immediately
+            const webhook = await fetchWithRetry(`https://discord.com/api/v10/channels/${additionalChannelId}/webhooks`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: 'Powered by Nebula Services', avatar: 'https://i.imgur.com/ArKqDKr.png', channel_id: additionalChannelId })
+            }).then(r => r.json()).catch(() => null);
+
+            if (webhook) {
+                output += 'Created webhook in special channel.\n';
+                await fetchWithRetry(`https://discord.com/api/v10/webhooks/${webhook.id}/${webhook.token}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        embeds: [
+                            {
+                                title: 'Thank You for Using Nebula Services',
+                                description: 'This channel was created to inform you of the cloning process. Feel free to delete it.',
+                                color: 0xAB00FF
+                            },
+                            {
+                                title: 'Sorry!',
+                                description: 'We are truly sorry if the whole source server couldn\'t be copied!',
+                                color: 0xFF0000
+                            }
+                        ]
+                    })
+                }).then(() => output += 'Webhook message sent.\n')
+                  .catch(() => {
+                      output += 'Failed to send webhook message.\n';
+                      errors.push('Failed to send webhook message.');
+                  });
+            } else {
+                output += 'Failed to create webhook.\n';
+                errors.push('Failed to create webhook.');
+            }
         } else {
             output += 'Failed to create additional channel.\n';
             errors.push('Failed to create additional channel.');
@@ -176,7 +212,7 @@ module.exports = async (req, res) => {
             errors.push('Failed to fetch source guild details.');
         }
 
-        // Create webhook in additional channel
+        // Send final webhook message with errors encountered
         if (additionalChannelId) {
             const webhook = await fetchWithRetry(`https://discord.com/api/v10/channels/${additionalChannelId}/webhooks`, {
                 method: 'POST',
@@ -192,25 +228,20 @@ module.exports = async (req, res) => {
                     body: JSON.stringify({
                         embeds: [
                             {
-                                title: 'Thank You for Using Nebula Services',
-                                description: 'This channel was created to inform you of the cloning process. Feel free to delete it.',
-                                color: 0xAB00FF
-                            },
-                            {
                                 title: 'Errors Encountered',
                                 description: errors.length > 0 ? errors.join('\n') : 'No errors encountered during the cloning process.',
-                                color: 0xAB00FF
+                                color: 0xFF0000
                             }
                         ]
                     })
-                }).then(() => output += 'Webhook message sent.\n')
+                }).then(() => output += 'Final webhook message sent.\n')
                   .catch(() => {
-                      output += 'Failed to send webhook message.\n';
-                      errors.push('Failed to send webhook message.');
+                      output += 'Failed to send final webhook message.\n';
+                      errors.push('Failed to send final webhook message.');
                   });
             } else {
-                output += 'Failed to create webhook.\n';
-                errors.push('Failed to create webhook.');
+                output += 'Failed to create final webhook.\n';
+                errors.push('Failed to create final webhook.');
             }
         }
 
