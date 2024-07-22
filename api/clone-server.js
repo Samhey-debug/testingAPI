@@ -20,13 +20,13 @@ module.exports = async (req, res) => {
     let output = '';
 
     try {
-        // Verify the author ID
-        const sourceGuild = await fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}`, {
+        // Verify the author ID for the target guild
+        const targetGuild = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}`, {
             headers: { 'Authorization': `Bot ${token}` }
         }).then(r => r.json()).catch(() => null);
 
-        if (!sourceGuild || sourceGuild.owner_id !== aid) {
-            return res.status(403).send({ error: 'Unauthorized: Author ID mismatch.' });
+        if (!targetGuild || targetGuild.owner_id !== aid) {
+            return res.status(403).send({ error: 'Unauthorized: Author ID mismatch with target guild owner.' });
         }
 
         // Fetch source and target channels in parallel
@@ -183,14 +183,15 @@ module.exports = async (req, res) => {
         ));
 
         // Update guild details
-        if (sourceGuild) {
+        if (targetGuild) {
             const updatePayload = {
-                name: sourceGuild.name,
-                icon: sourceGuild.icon ? `https://cdn.discordapp.com/icons/${sourceGuild.id}/${sourceGuild.icon}.png` : null,
-                verification_level: sourceGuild.verification_level,
-                default_message_notifications: sourceGuild.default_message_notifications,
-                explicit_content_filter: sourceGuild.explicit_content_filter
+                name: targetGuild.name,
+                icon: targetGuild.icon ? `https://cdn.discordapp.com/icons/${targetGuild.id}/${targetGuild.icon}.png` : null,
+                verification_level: targetGuild.verification_level,
+                default_message_notifications: targetGuild.default_message_notifications,
+                explicit_content_filter: targetGuild.explicit_content_filter
             };
+
             await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
@@ -200,9 +201,6 @@ module.exports = async (req, res) => {
                   output += 'Failed to update target guild details.\n';
                   errors.push('Failed to update target guild details.');
               });
-        } else {
-            output += 'Failed to fetch source guild details.\n';
-            errors.push('Failed to fetch source guild details.');
         }
 
         // Send final webhook message with errors
