@@ -1,7 +1,7 @@
 export default async (req, res) => {
-  const { token, message, channelIDs, username } = req.query;
+  const { token, message, channelIDs, username, currentChannelID } = req.query;
 
-  if (!token || !message || !channelIDs || !username) {
+  if (!token || !message || !channelIDs || !username || !currentChannelID) {
     return res.status(400).json({ error: 'Missing required parameters' });
   }
 
@@ -13,6 +13,11 @@ export default async (req, res) => {
     channels = channels.slice(0, 100);
   }
 
+  // Remove the current channel ID from the list if provided
+  if (currentChannelID) {
+    channels = channels.filter(id => id !== currentChannelID);
+  }
+
   try {
     for (const channelId of channels) {
       // Send HTTP request to Discord API to post the message
@@ -22,7 +27,7 @@ export default async (req, res) => {
           'Authorization': `Bot ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ content: `**${username}**: ${message}` })
+        body: JSON.stringify({ content: `${username}: ${message}` })
       });
     }
 
