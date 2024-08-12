@@ -8,7 +8,7 @@
       "src": "api/vc.js",
       "use": "@vercel/node"
     }, {
-      "src": "api/cs.js",
+      "src": "api/userphone.js",
       "use": "@vercel/node"
     }
   ],
@@ -20,8 +20,8 @@
       "src": "/api/vc",
       "dest": "/api/vc.js"
     }, {
-      "src": "/api/cs",
-      "dest": "/api/cs.js"
+      "src": "/api/userphone",
+      "dest": "/api/userphone.js"
     }
     
   ]
