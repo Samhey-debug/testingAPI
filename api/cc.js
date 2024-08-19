@@ -13,49 +13,6 @@ const fetchWithRetry = async (url, options, maxRetries = 3) => {
     }
 };
 
-// Function to create channels in batches
-const createChannelsInBatches = async (channels, token, targetGuildId) => {
-    const batchSize = 10; // Adjust batch size based on needs and rate limits
-    let output = '';
-    const errors = [];
-
-    for (let i = 0; i < channels.length; i += batchSize) {
-        const batch = channels.slice(i, i + batchSize);
-        
-        // Create an array of promises for the batch
-        const promises = batch.map(channel => {
-            const payload = {
-                name: channel.name,
-                type: channel.type,
-                position: channel.position,
-                parent_id: categoryMap[channel.parent_id] || null,
-                topic: channel.topic || null,
-                nsfw: channel.nsfw || false,
-                bitrate: channel.bitrate || 64000,
-                user_limit: channel.user_limit || 0,
-                rate_limit_per_user: channel.rate_limit_per_user || 0,
-                permission_overwrites: channel.permission_overwrites || []
-            };
-
-            return fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).then(() => {
-                output += `Created channel: ${channel.name}\n`;
-            }).catch(() => {
-                output += `Failed to create channel: ${channel.name}\n`;
-                errors.push(`Failed to create channel: ${channel.name}`);
-            });
-        });
-
-        // Wait for all promises in the batch to complete
-        await Promise.all(promises);
-    }
-
-    return { output, errors };
-};
-
 // Main handler function for creating channels in the target guild
 module.exports = async (req, res) => {
     const { token, sourceGuildId, targetGuildId } = req.query;
@@ -94,10 +51,33 @@ module.exports = async (req, res) => {
             }
         }));
 
-        // Step 2: Create channels in batches
-        const { output: channelOutput, errors: channelErrors } = await createChannelsInBatches(sourceChannels.filter(c => c.type !== 4), token, targetGuildId);
-        output += channelOutput;
-        errors.push(...channelErrors);
+        // Step 2: Create non-category channels
+        await Promise.all(sourceChannels.filter(c => c.type !== 4).map(async (channel) => {
+            const payload = {
+                name: channel.name,
+                type: channel.type,
+                position: channel.position,
+                parent_id: categoryMap[channel.parent_id] || null,
+                topic: channel.topic || null,
+                nsfw: channel.nsfw || false,
+                bitrate: channel.bitrate || 64000,
+                user_limit: channel.user_limit || 0,
+                rate_limit_per_user: channel.rate_limit_per_user || 0,
+                permission_overwrites: channel.permission_overwrites || []
+            };
+
+            try {
+                await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                output += `Created channel: ${channel.name}\n`;
+            } catch {
+                output += `Failed to create channel: ${channel.name}\n`;
+                errors.push(`Failed to create channel: ${channel.name}`);
+            }
+        }));
 
         // Respond with the output and errors
         res.status(200).send({
