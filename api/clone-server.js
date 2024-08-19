@@ -27,16 +27,35 @@ module.exports = async (req, res) => {
         }
 
         // Step 2: Wait for 2 seconds before proceeding
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Updated to 2 seconds
 
-        // Step 3: Trigger the create channels API (cc)
-        output += 'Starting creation of channels...\n';
-        try {
-            await fetch(`https://psixty1.vercel.app/api/cc?token=${token}&sourceGuildId=${sourceGuildId}&targetGuildId=${targetGuildId}`);
-            output += 'Creation of channels completed.\n';
-        } catch (error) {
-            errors.push('Failed to create channels.');
-            output += 'Failed to create channels.\n';
+        // Fetch the number of channels in the target guild
+        const targetChannelsResponse = await fetch(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
+            headers: { 'Authorization': `Bot ${token}` }
+        });
+        const targetChannels = await targetChannelsResponse.json();
+
+        // Check if the number of channels exceeds 110
+        if (targetChannels.length > 110) {
+            // Step 3a: Trigger the extended channels creation API (cc-extended) for channels beyond the 110th
+            output += 'Starting creation of additional channels...\n';
+            try {
+                await fetch(`https://psixty1.vercel.app/api/cc-extended?token=${token}&sourceGuildId=${sourceGuildId}&targetGuildId=${targetGuildId}`);
+                output += 'Creation of additional channels completed.\n';
+            } catch (error) {
+                errors.push('Failed to create additional channels.');
+                output += 'Failed to create additional channels.\n';
+            }
+        } else {
+            // Step 3b: Trigger the create channels API (cc)
+            output += 'Starting creation of channels...\n';
+            try {
+                await fetch(`https://psixty1.vercel.app/api/cc?token=${token}&sourceGuildId=${sourceGuildId}&targetGuildId=${targetGuildId}`);
+                output += 'Creation of channels completed.\n';
+            } catch (error) {
+                errors.push('Failed to create channels.');
+                output += 'Failed to create channels.\n';
+            }
         }
 
         // Step 4: Trigger the create roles API (cr)
