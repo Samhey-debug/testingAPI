@@ -1,4 +1,5 @@
 const fetch = require('node-fetch');
+const pLimit = require('p-limit');
 
 // Utility function to perform fetch requests with retries
 const fetchWithRetry = async (url, options, maxRetries = 3) => {
@@ -19,6 +20,9 @@ module.exports = async (req, res) => {
     const errors = [];
     let output = '';
 
+    // Limit the number of concurrent requests
+    const limit = pLimit(30); // Adjust concurrency limit as needed
+
     try {
         // Fetch channels from the source guild
         const sourceChannelsResponse = await fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}/channels`, {
@@ -31,8 +35,8 @@ module.exports = async (req, res) => {
         // Map for category IDs
         const categoryMap = {};
 
-        // First, create categories
-        await Promise.all(sourceChannels.filter(c => c.type === 4).map(async (channel) => {
+        // Create categories first
+        await Promise.all(sourceChannels.filter(c => c.type === 4).map(channel => limit(async () => {
             try {
                 const payload = {
                     name: channel.name,
@@ -56,8 +60,8 @@ module.exports = async (req, res) => {
             }
         }));
 
-        // Then, create non-category channels
-        await Promise.all(sourceChannels.filter(c => c.type !== 4).map(async (channel) => {
+        // Create non-category channels
+        await Promise.all(sourceChannels.filter(c => c.type !== 4).map(channel => limit(async () => {
             try {
                 const payload = {
                     name: channel.name,
