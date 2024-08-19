@@ -19,6 +19,12 @@
     }, {
       "src": "api/cr.js",
       "use": "@vercel/node"
+    }, {
+      "src": "api/cc-extended.js",
+      "use": "@vercel/node"
+    }, {
+      "src": "api/cc-extended-220.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -40,6 +46,12 @@
     }, {
       "src": "/api/cc",
       "dest": "/api/cc.js"
+    }, {
+      "src": "/api/cc-extended",
+      "dest": "/api/cc-extended.js"
+    }, {
+      "src": "/api/cc-extended-220",
+      "dest": "/api/cc-extended-220.js"
     }
     
   ]
