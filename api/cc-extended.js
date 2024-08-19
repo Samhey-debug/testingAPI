@@ -13,7 +13,7 @@ const fetchWithRetry = async (url, options, maxRetries = 3) => {
     }
 };
 
-// Main handler function for creating channels beyond the 110th channel
+// Main handler function for creating channels beyond the 110th but not 220th
 module.exports = async (req, res) => {
     const { token, sourceGuildId, targetGuildId } = req.query;
     const errors = [];
@@ -28,8 +28,8 @@ module.exports = async (req, res) => {
 
         output += `Fetched ${sourceChannels.length} channels from source guild.\n`;
 
-        // Filter out the channels beyond the 110th
-        const channelsToCreate = sourceChannels.slice(110);
+        // Filter out the channels beyond the 110th but not beyond the 220th
+        const channelsToCreate = sourceChannels.slice(110, 220);
 
         output += `Preparing to create ${channelsToCreate.length} additional channels in target guild.\n`;
 
@@ -61,7 +61,7 @@ module.exports = async (req, res) => {
             }
         }));
 
-        // Respond with the output and any errors encountered
+        // Respond with the output and errors
         res.status(200).send({
             message: output,
             errors: errors
