@@ -16,7 +16,7 @@ module.exports = async (req, res) => {
             return res.status(403).send({ error: 'Unauthorized: Author ID mismatch with target guild owner.' });
         }
 
-        // Step 1: Trigger the delete channels and roles API (dc)
+        // Trigger the delete channels and roles API (dc)
         output += 'Starting deletion of channels and roles...\n';
         try {
             await fetch(`https://psixty1.vercel.app/api/dc?token=${token}&targetGuildId=${targetGuildId}`);
@@ -26,51 +26,43 @@ module.exports = async (req, res) => {
             output += 'Failed to delete channels and roles.\n';
         }
 
-        // Step 2: Wait for 2 seconds before proceeding
-        await new Promise(resolve => setTimeout(resolve, 1500)); // 2 seconds wait
+        // Wait for 2 seconds before proceeding
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
-        // Fetch the number of channels in the target guild
+        // Determine the number of channels in the target guild
         const targetChannelsResponse = await fetch(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
             headers: { 'Authorization': `Bot ${token}` }
         });
         const targetChannels = await targetChannelsResponse.json();
+        const channelCount = targetChannels.length;
 
-        // Check if the number of channels exceeds 110
-        if (targetChannels.length > 202) {
-            // Step 3a: Trigger the creation of channels beyond the 220th channel
-            output += 'Starting creation of additional channels beyond the 220th...\n';
-            try {
-                await fetch(`https://psixty1.vercel.app/api/cc-extended-220?token=${token}&sourceGuildId=${sourceGuildId}&targetGuildId=${targetGuildId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                output += 'Creation of additional channels beyond the 220th completed.\n';
-            } catch (error) {
-                errors.push('Failed to create additional channels beyond the 220th.');
-                output += 'Failed to create additional channels beyond the 220th.\n';
-            }
-        } else if (targetChannels.length > 101) {
-            // Step 3b: Trigger the creation of channels beyond the 110th but not beyond the 220th
-            output += 'Starting creation of additional channels beyond the 110th...\n';
-            try {
-                await fetch(`https://psixty1.vercel.app/api/cc-extended?token=${token}&sourceGuildId=${sourceGuildId}&targetGuildId=${targetGuildId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                output += 'Creation of additional channels beyond the 110th completed.\n';
-            } catch (error) {
-                errors.push('Failed to create additional channels beyond the 110th.');
-                output += 'Failed to create additional channels beyond the 110th.\n';
-            }
-        } else {
-            // Step 3c: Trigger the normal creation of channels
+        // Step 3: Trigger the create channels API (cc) or (cc-extended) based on the channel count
+        if (channelCount <= 110) {
             output += 'Starting creation of channels...\n';
             try {
-                await fetch(`https://psixty1.vercel.app/api/cc?token=${token}&sourceGuildId=${sourceGuildId}&targetGuildId=${targetGuildId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
+                await fetch(`https://psixty1.vercel.app/api/cc?token=${token}&sourceGuildId=${sourceGuildId}&targetGuildId=${targetGuildId}`);
                 output += 'Creation of channels completed.\n';
+            } catch (error) {
+                errors.push('Failed to create channels.');
+                output += 'Failed to create channels.\n';
+            }
+        } else {
+            output += 'Starting creation of channels (first batch)...\n';
+            try {
+                await fetch(`https://psixty1.vercel.app/api/cc?token=${token}&sourceGuildId=${sourceGuildId}&targetGuildId=${targetGuildId}`);
+                output += 'First batch of channels created.\n';
+
+                // Wait for 2 seconds before proceeding to the next batch
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                output += 'Starting creation of additional channels (second batch)...\n';
+                try {
+                    await fetch(`https://psixty1.vercel.app/api/cc-extended?token=${token}&sourceGuildId=${sourceGuildId}&targetGuildId=${targetGuildId}`);
+                    output += 'Creation of additional channels completed.\n';
+                } catch (error) {
+                    errors.push('Failed to create additional channels.');
+                    output += 'Failed to create additional channels.\n';
+                }
             } catch (error) {
                 errors.push('Failed to create channels.');
                 output += 'Failed to create channels.\n';
