@@ -27,7 +27,7 @@ module.exports = async (req, res) => {
         }
 
         // Step 2: Wait for 2 seconds before proceeding
-        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 seconds wait
+        await new Promise(resolve => setTimeout(resolve, 1500)); // 2 seconds wait
 
         // Fetch the number of channels in the target guild
         const targetChannelsResponse = await fetch(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
@@ -36,7 +36,7 @@ module.exports = async (req, res) => {
         const targetChannels = await targetChannelsResponse.json();
 
         // Check if the number of channels exceeds 110
-        if (targetChannels.length > 220) {
+        if (targetChannels.length > 140) {
             // Step 3a: Trigger the creation of channels beyond the 220th channel
             output += 'Starting creation of additional channels beyond the 220th...\n';
             try {
@@ -49,7 +49,7 @@ module.exports = async (req, res) => {
                 errors.push('Failed to create additional channels beyond the 220th.');
                 output += 'Failed to create additional channels beyond the 220th.\n';
             }
-        } else if (targetChannels.length > 110) {
+        } else if (targetChannels.length > 70) {
             // Step 3b: Trigger the creation of channels beyond the 110th but not beyond the 220th
             output += 'Starting creation of additional channels beyond the 110th...\n';
             try {
