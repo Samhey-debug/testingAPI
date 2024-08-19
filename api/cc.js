@@ -13,7 +13,7 @@ const fetchWithRetry = async (url, options, maxRetries = 3) => {
     }
 };
 
-// Main handler function for creating channels in the target guild
+// Main handler function for creating channels and categories in the target guild
 module.exports = async (req, res) => {
     const { token, sourceGuildId, targetGuildId } = req.query;
     const errors = [];
@@ -28,21 +28,26 @@ module.exports = async (req, res) => {
 
         output += `Fetched ${sourceChannels.length} channels from source guild.\n`;
 
-        // Step 1: Create categories first and map their IDs
+        // Map for category IDs
         const categoryMap = {};
+
+        // First, create categories
         await Promise.all(sourceChannels.filter(c => c.type === 4).map(async (channel) => {
             try {
+                const payload = {
+                    name: channel.name,
+                    type: channel.type,
+                    position: channel.position,
+                    permission_overwrites: channel.permission_overwrites
+                };
+
                 const createdCategoryResponse = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name: channel.name,
-                        type: channel.type,
-                        position: channel.position,
-                        permission_overwrites: channel.permission_overwrites
-                    })
+                    body: JSON.stringify(payload)
                 });
                 const createdCategory = await createdCategoryResponse.json();
+
                 categoryMap[channel.id] = createdCategory.id;
                 output += `Created category: ${createdCategory.name}\n`;
             } catch {
@@ -51,22 +56,22 @@ module.exports = async (req, res) => {
             }
         }));
 
-        // Step 2: Create non-category channels
+        // Then, create non-category channels
         await Promise.all(sourceChannels.filter(c => c.type !== 4).map(async (channel) => {
-            const payload = {
-                name: channel.name,
-                type: channel.type,
-                position: channel.position,
-                parent_id: categoryMap[channel.parent_id] || null,
-                topic: channel.topic || null,
-                nsfw: channel.nsfw || false,
-                bitrate: channel.bitrate || 64000,
-                user_limit: channel.user_limit || 0,
-                rate_limit_per_user: channel.rate_limit_per_user || 0,
-                permission_overwrites: channel.permission_overwrites || []
-            };
-
             try {
+                const payload = {
+                    name: channel.name,
+                    type: channel.type,
+                    position: channel.position,
+                    parent_id: categoryMap[channel.parent_id] || null,
+                    topic: channel.topic || null,
+                    nsfw: channel.nsfw || false,
+                    bitrate: channel.bitrate || 64000,
+                    user_limit: channel.user_limit || 0,
+                    rate_limit_per_user: channel.rate_limit_per_user || 0,
+                    permission_overwrites: channel.permission_overwrites || []
+                };
+
                 await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
