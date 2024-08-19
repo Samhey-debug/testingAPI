@@ -66,4 +66,4 @@ module.exports = async (req, res) => {
         // Catch and log any unexpected errors
         res.status(500).send({ error: `Unexpected error occurred: ${error.message}` });
     }
-};
+}; 
