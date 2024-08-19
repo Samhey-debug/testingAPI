@@ -10,6 +10,15 @@
     }, {
       "src": "api/userphone.js",
       "use": "@vercel/node"
+    }, {
+      "src": "api/dc.js",
+      "use": "@vercel/node"
+    }, {
+      "src": "api/cc.js",
+      "use": "@vercel/node"
+    }, {
+      "src": "api/cr.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -22,6 +31,15 @@
     }, {
       "src": "/api/userphone",
       "dest": "/api/userphone.js"
+    }, {
+      "src": "/api/dc",
+      "dest": "/api/dc.js"
+    }, {
+      "src": "/api/cr",
+      "dest": "/api/cr.js"
+    }, {
+      "src": "/api/cc",
+      "dest": "/api/cc.js"
     }
     
   ]
