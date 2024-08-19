@@ -27,7 +27,7 @@ module.exports = async (req, res) => {
         }
 
         // Step 2: Wait for 2 seconds before proceeding
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 1500));
 
         // Step 3: Trigger the create channels API (cc)
         output += 'Starting creation of channels...\n';
