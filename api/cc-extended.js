@@ -8,7 +8,7 @@ const fetchWithRetry = async (url, options, maxRetries = 3) => {
             if (response.ok) return response;
             throw new Error(`HTTP error ${response.status}`);
         } catch (error) {
-            if (retries === maxRetries - 1) throw new Error(`Failed to fetch ${url}`);
+            if (retries === maxRetries - 1) throw new Error(`Failed to fetch ${url}: ${error.message}`);
         }
     }
 };
@@ -18,7 +18,7 @@ const isCommunityServer = (guild) => {
     return guild.features.includes('COMMUNITY');
 };
 
-// Main handler function for creating channels beyond the 110th but not 220th
+// Main handler function for creating channels beyond the 220th channel
 module.exports = async (req, res) => {
     const { token, sourceGuildId, targetGuildId } = req.query;
     const errors = [];
@@ -42,8 +42,8 @@ module.exports = async (req, res) => {
 
         output += `Fetched ${sourceChannels.length} channels from source guild.\n`;
 
-        // Filter out the channels beyond the 110th but not beyond the 220th
-        const channelsToCreate = sourceChannels.slice(110, 220);
+        // Filter out the channels beyond the 220th
+        const channelsToCreate = sourceChannels.slice(220);
 
         output += `Preparing to create ${channelsToCreate.length} additional channels in target guild.\n`;
 
@@ -56,7 +56,7 @@ module.exports = async (req, res) => {
                     // Adjust channel type based on the target guild's type
                     const payload = {
                         name: channel.name,
-                        type: isCommunity && channel.type === 5 ? 5 : (channel.type === 5 ? 0 : channel.type),
+                        type: channel.type === 4 ? 4 : (isCommunity && channel.type === 5 ? 5 : channel.type),
                         position: channel.position,
                         parent_id: channel.parent_id || null,
                         topic: channel.topic || null,
@@ -67,15 +67,24 @@ module.exports = async (req, res) => {
                         permission_overwrites: channel.permission_overwrites || []
                     };
 
-                    await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
+                    console.log(`Creating channel: ${channel.name} with payload:`, payload);
+
+                    const createChannelResponse = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
                         method: 'POST',
                         headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
-                    output += `Created additional channel: ${channel.name}\n`;
-                } catch {
-                    output += `Failed to create additional channel: ${channel.name}\n`;
-                    errors.push(`Failed to create additional channel: ${channel.name}`);
+
+                    if (createChannelResponse.ok) {
+                        output += `Created additional channel: ${channel.name}\n`;
+                    } else {
+                        const errorText = await createChannelResponse.text();
+                        output += `Failed to create additional channel: ${channel.name}. Status: ${createChannelResponse.status}, Response: ${errorText}\n`;
+                        errors.push(`Failed to create additional channel: ${channel.name}. Status: ${createChannelResponse.status}, Response: ${errorText}`);
+                    }
+                } catch (error) {
+                    output += `Failed to create additional channel: ${channel.name}. Error: ${error.message}\n`;
+                    errors.push(`Failed to create additional channel: ${channel.name}. Error: ${error.message}`);
                 }
             }));
         }
