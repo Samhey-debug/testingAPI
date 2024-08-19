@@ -1,4 +1,4 @@
- const fetch = require('node-fetch');
+const fetch = require('node-fetch');
 
 // Utility function to perform fetch requests with retries
 const fetchWithRetry = async (url, options, maxRetries = 3) => {
@@ -31,37 +31,34 @@ module.exports = async (req, res) => {
         // Map for category IDs
         const categoryMap = {};
 
-        // Create categories first
-        const createCategoriesPromises = sourceChannels
-            .filter(c => c.type === 4) // Only categories
-            .map(channel => {
+        // First, create categories
+        await Promise.all(sourceChannels.filter(c => c.type === 4).map(async (channel) => {
+            try {
                 const payload = {
                     name: channel.name,
                     type: channel.type,
                     position: channel.position,
                     permission_overwrites: channel.permission_overwrites
                 };
-                return fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
+
+                const createdCategoryResponse = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
-                }).then(response => response.json())
-                .then(createdCategory => {
-                    categoryMap[channel.id] = createdCategory.id;
-                    output += `Created category: ${createdCategory.name}\n`;
-                }).catch(() => {
-                    output += `Failed to create category: ${channel.name}\n`;
-                    errors.push(`Failed to create category: ${channel.name}`);
                 });
-            });
+                const createdCategory = await createdCategoryResponse.json();
 
-        // Wait for all categories to be created
-        await Promise.all(createCategoriesPromises);
+                categoryMap[channel.id] = createdCategory.id;
+                output += `Created category: ${createdCategory.name}\n`;
+            } catch {
+                output += `Failed to create category: ${channel.name}\n`;
+                errors.push(`Failed to create category: ${channel.name}`);
+            }
+        }));
 
-        // Create channels
-        const createChannelsPromises = sourceChannels
-            .filter(c => c.type !== 4) // Non-categories
-            .map(channel => {
+        // Then, create non-category channels
+        await Promise.all(sourceChannels.filter(c => c.type !== 4).map(async (channel) => {
+            try {
                 const payload = {
                     name: channel.name,
                     type: channel.type,
@@ -74,20 +71,18 @@ module.exports = async (req, res) => {
                     rate_limit_per_user: channel.rate_limit_per_user || 0,
                     permission_overwrites: channel.permission_overwrites || []
                 };
-                return fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
+
+                await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
-                }).then(() => {
-                    output += `Created channel: ${channel.name}\n`;
-                }).catch(() => {
-                    output += `Failed to create channel: ${channel.name}\n`;
-                    errors.push(`Failed to create channel: ${channel.name}`);
                 });
-            });
-
-        // Wait for all channels to be created
-        await Promise.all(createChannelsPromises);
+                output += `Created channel: ${channel.name}\n`;
+            } catch {
+                output += `Failed to create channel: ${channel.name}\n`;
+                errors.push(`Failed to create channel: ${channel.name}`);
+            }
+        }));
 
         // Respond with the output and errors
         res.status(200).send({
