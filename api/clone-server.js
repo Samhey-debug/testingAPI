@@ -1,5 +1,19 @@
 const fetch = require('node-fetch');
 
+// Utility function to perform fetch requests with retries
+const fetchWithRetry = async (url, options, maxRetries = 3) => {
+    for (let retries = 0; retries < maxRetries; retries++) {
+        try {
+            const response = await fetch(url, options);
+            if (response.ok) return response;
+            throw new Error(`HTTP error ${response.status}`);
+        } catch (error) {
+            if (retries === maxRetries - 1) throw new Error(`Failed to fetch ${url}`);
+        }
+    }
+};
+
+// Main handler function for cloning a server
 module.exports = async (req, res) => {
     const { token, sourceGuildId, targetGuildId, aid } = req.query;
     const errors = [];
@@ -7,7 +21,7 @@ module.exports = async (req, res) => {
 
     try {
         // Validate the target guild owner
-        const targetGuildResponse = await fetch(`https://discord.com/api/v10/guilds/${targetGuildId}`, {
+        const targetGuildResponse = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}`, {
             headers: { 'Authorization': `Bot ${token}` }
         });
         const targetGuild = await targetGuildResponse.json();
@@ -19,7 +33,7 @@ module.exports = async (req, res) => {
         // Trigger the delete channels and roles API (dc)
         output += 'Starting deletion of channels and roles...\n';
         try {
-            await fetch(`https://psixty1.vercel.app/api/dc?token=${token}&targetGuildId=${targetGuildId}`);
+            await fetchWithRetry(`https://psixty1.vercel.app/api/dc?token=${token}&targetGuildId=${targetGuildId}`);
             output += 'Deletion of channels and roles completed.\n';
         } catch (error) {
             errors.push('Failed to delete channels and roles.');
@@ -29,50 +43,20 @@ module.exports = async (req, res) => {
         // Wait for 2 seconds before proceeding
         await new Promise(resolve => setTimeout(resolve, 2000));
 
-        // Determine the number of channels in the target guild
-        const targetChannelsResponse = await fetch(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
-            headers: { 'Authorization': `Bot ${token}` }
-        });
-        const targetChannels = await targetChannelsResponse.json();
-        const channelCount = targetChannels.length;
-
-        // Step 3: Trigger the create channels API (cc) or (cc-extended) based on the channel count
-        if (channelCount <= 110) {
-            output += 'Starting creation of channels...\n';
-            try {
-                await fetch(`https://psixty1.vercel.app/api/cc?token=${token}&sourceGuildId=${sourceGuildId}&targetGuildId=${targetGuildId}`);
-                output += 'Creation of channels completed.\n';
-            } catch (error) {
-                errors.push('Failed to create channels.');
-                output += 'Failed to create channels.\n';
-            }
-        } else {
-            output += 'Starting creation of channels (first batch)...\n';
-            try {
-                await fetch(`https://psixty1.vercel.app/api/cc?token=${token}&sourceGuildId=${sourceGuildId}&targetGuildId=${targetGuildId}`);
-                output += 'First batch of channels created.\n';
-
-                // Wait for 2 seconds before proceeding to the next batch
-                await new Promise(resolve => setTimeout(resolve, 2000));
-
-                output += 'Starting creation of additional channels (second batch)...\n';
-                try {
-                    await fetch(`https://psixty1.vercel.app/api/cc-extended?token=${token}&sourceGuildId=${sourceGuildId}&targetGuildId=${targetGuildId}`);
-                    output += 'Creation of additional channels completed.\n';
-                } catch (error) {
-                    errors.push('Failed to create additional channels.');
-                    output += 'Failed to create additional channels.\n';
-                }
-            } catch (error) {
-                errors.push('Failed to create channels.');
-                output += 'Failed to create channels.\n';
-            }
+        // Trigger the create channels API (cc)
+        output += 'Starting creation of channels...\n';
+        try {
+            await fetchWithRetry(`https://psixty1.vercel.app/api/cc?token=${token}&sourceGuildId=${sourceGuildId}&targetGuildId=${targetGuildId}`);
+            output += 'Creation of channels completed.\n';
+        } catch (error) {
+            errors.push('Failed to create channels.');
+            output += 'Failed to create channels.\n';
         }
 
-        // Step 4: Trigger the create roles API (cr)
+        // Trigger the create roles API (cr)
         output += 'Starting creation of roles...\n';
         try {
-            await fetch(`https://psixty1.vercel.app/api/cr?token=${token}&sourceGuildId=${sourceGuildId}&targetGuildId=${targetGuildId}`);
+            await fetchWithRetry(`https://psixty1.vercel.app/api/cr?token=${token}&sourceGuildId=${sourceGuildId}&targetGuildId=${targetGuildId}`);
             output += 'Creation of roles completed.\n';
         } catch (error) {
             errors.push('Failed to create roles.');
