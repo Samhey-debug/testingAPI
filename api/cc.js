@@ -13,7 +13,7 @@ const fetchWithRetry = async (url, options, maxRetries = 3) => {
     }
 };
 
-// Main handler function for creating channels in the target guild
+// Main handler function for creating channels and categories in the target guild
 module.exports = async (req, res) => {
     const { token, sourceGuildId, targetGuildId } = req.query;
     const errors = [];
@@ -28,14 +28,42 @@ module.exports = async (req, res) => {
 
         output += `Fetched ${sourceChannels.length} channels from source guild.\n`;
 
-        // Create channels in the target guild
-        await Promise.all(sourceChannels.map(async (channel) => {
+        // Map for category IDs
+        const categoryMap = {};
+
+        // First, create categories
+        await Promise.all(sourceChannels.filter(c => c.type === 4).map(async (channel) => {
             try {
                 const payload = {
                     name: channel.name,
                     type: channel.type,
                     position: channel.position,
-                    parent_id: channel.parent_id || null,
+                    permission_overwrites: channel.permission_overwrites
+                };
+
+                const createdCategoryResponse = await fetchWithRetry(`https://discord.com/api/v10/guilds/${targetGuildId}/channels`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bot ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const createdCategory = await createdCategoryResponse.json();
+
+                categoryMap[channel.id] = createdCategory.id;
+                output += `Created category: ${createdCategory.name}\n`;
+            } catch {
+                output += `Failed to create category: ${channel.name}\n`;
+                errors.push(`Failed to create category: ${channel.name}`);
+            }
+        }));
+
+        // Then, create non-category channels
+        await Promise.all(sourceChannels.filter(c => c.type !== 4).map(async (channel) => {
+            try {
+                const payload = {
+                    name: channel.name,
+                    type: channel.type,
+                    position: channel.position,
+                    parent_id: categoryMap[channel.parent_id] || null,
                     topic: channel.topic || null,
                     nsfw: channel.nsfw || false,
                     bitrate: channel.bitrate || 64000,
@@ -66,4 +94,4 @@ module.exports = async (req, res) => {
         // Catch and log any unexpected errors
         res.status(500).send({ error: `Unexpected error occurred: ${error.message}` });
     }
-}; 
+};
