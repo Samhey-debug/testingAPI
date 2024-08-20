@@ -3,7 +3,7 @@ const https = require("https");
 module.exports = async (req, res) => {
   const { imgURL, caption } = req.query;
   const pageId = "100093679784274"; // Replace with your Facebook Page ID
-  const accessToken = process.env.ACCESS_TOKEN; // Store this in your environment variables
+  const accessToken = EAAUp9UBCVSsBOwh9fa4zitYy4LXFt3ddG3SbZAuLEp2RZBl9AYvwsCXlEfWF6WMzY8l102suCVVtyyewKqqAbXtavR6ZACqgiHdlA2joka1z6rNPSAqeGuqPNHrorCEET1NyDJxrK6z69DynNU2A9g1MektXgbtxQggvSwqtSKdLgLo552AZA91qQqQEA3Rxt6sZD; // Store this in your environment variables
 
   if (!imgURL || !caption) {
     return res.status(400).json({ error: "imgURL and caption are required" });
