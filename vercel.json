@@ -25,6 +25,9 @@
     }, {
       "src": "api/cc-extended-220.js",
       "use": "@vercel/node"
+    }, {
+      "src": "api/insta-post.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -52,6 +55,9 @@
     }, {
       "src": "/api/cc-extended-220",
       "dest": "/api/cc-extended-220.js"
+    }, {
+      "src": "/api/insta-post",
+      "dest": "/api/insta-post.js"
     }
     
   ]
