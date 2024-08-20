@@ -7,7 +7,7 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: "imgURL and caption are required" });
     }
 
-    const pageId = "100093679784274"; // Replace with your Facebook Page ID
+    const pageId = "378775198588470"; // Replace with your Facebook Page ID
     const accessToken = process.env.ACCESS_TOKEN;
 
     // Step 1: Get Instagram Account ID
