@@ -1,20 +1,23 @@
 {
-  "name": "fun stuff",
+  "name": "fun-stuff-midi-visualizer",
   "version": "1.0.0",
-  "description": "a bunch of cool stuff",
+  "description": "A fun MIDI visualizer and a bunch of cool stuff.",
   "main": "index.js",
   "dependencies": {
     "node-fetch": "^2.6.1",
     "discord.js": "^13.0.0",
     "@discordjs/voice": "^0.7.0",
-    "ytdl-core": "^4.9.1"
+    "ytdl-core": "^4.9.1",
+    "tone": "^14.7.77",
+    "serve": "^14.2.0"
   },
   "engines": {
     "node": ">=16.6.0"
   },
   "devDependencies": {},
   "scripts": {
-    "start": "vercel dev"
+    "start": "serve .",
+    "dev": "vercel dev"
   },
   "author": "p61s",
   "license": "MIT"
