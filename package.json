@@ -1,7 +1,7 @@
 {
-  "name": "discord-cloner",
+  "name": "fun stuff",
   "version": "1.0.0",
-  "description": "A Discord server cloning service using Vercel.",
+  "description": "a bunch of cool stuff",
   "main": "index.js",
   "dependencies": {
     "node-fetch": "^2.6.1",
