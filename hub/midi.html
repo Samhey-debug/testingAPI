@@ -1,1 +1,129 @@
-hi
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI Visualizer with Bouncing Squares</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: #282c34;
+            color: #61dafb;
+        }
+        canvas {
+            border: 2px solid #61dafb;
+            background: #1e1e1e;
+        }
+        input, button {
+            margin: 10px;
+            padding: 10px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>MIDI Visualizer</h1>
+    <input type="file" id="midiFileInput" accept=".mid,.midi">
+    <input type="number" id="bpmInput" placeholder="Set BPM (default 120)" />
+    <button onclick="startPlayback()">Play MIDI</button>
+    <canvas id="visualizationCanvas" width="800" height="600"></canvas>
+
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.8.32/build/Tone.js"></script>
+    <script>
+        let midiData;
+        const canvas = document.getElementById('visualizationCanvas');
+        const ctx = canvas.getContext('2d');
+        let squares = [];
+
+        // Load MIDI file
+        document.getElementById('midiFileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const arrayBuffer = e.target.result;
+                midiData = new Tone.Midi(arrayBuffer);
+                alert('MIDI file loaded! You can now set BPM and hit play.');
+            };
+
+            reader.readAsArrayBuffer(file);
+        });
+
+        // Start playback and visualization
+        function startPlayback() {
+            const bpm = document.getElementById('bpmInput').value || 120;
+            Tone.Transport.bpm.value = bpm;
+
+            // Create a simple synth
+            const synth = new Tone.Synth().toDestination();
+
+            midiData.tracks.forEach(track => {
+                track.notes.forEach(note => {
+                    synth.triggerAttackRelease(note.name, note.duration, note.time);
+                    scheduleVisual(note); // Schedule the visual effect for each note
+                });
+            });
+
+            Tone.Transport.start();
+        }
+
+        // Schedule visual for each note
+        function scheduleVisual(note) {
+            const color = getNoteColor(note.name);
+            squares.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                vx: (Math.random() * 2 - 1) * 5, // Random velocity
+                vy: (Math.random() * 2 - 1) * 5,
+                size: 20,
+                color: color,
+                note: note.name,
+                time: note.time
+            });
+        }
+
+        // Get color based on note
+        function getNoteColor(note) {
+            const noteColors = {
+                'C': '#FF6347',  // Tomato red
+                'D': '#FFD700',  // Gold
+                'E': '#32CD32',  // Lime green
+                'F': '#1E90FF',  // Dodger blue
+                'G': '#EE82EE',  // Violet
+                'A': '#FF4500',  // Orange red
+                'B': '#ADFF2F',  // Green yellow
+            };
+            return noteColors[note[0]] || '#61dafb'; // Default blue for other notes
+        }
+
+        // Animate the squares
+        function drawSquares() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            squares.forEach(square => {
+                // Update position
+                square.x += square.vx;
+                square.y += square.vy;
+
+                // Bounce off walls
+                if (square.x <= 0 || square.x + square.size >= canvas.width) square.vx *= -1;
+                if (square.y <= 0 || square.y + square.size >= canvas.height) square.vy *= -1;
+
+                // Draw the square
+                ctx.fillStyle = square.color;
+                ctx.fillRect(square.x, square.y, square.size, square.size);
+            });
+
+            requestAnimationFrame(drawSquares); // Keep looping
+        }
+
+        drawSquares(); // Start the animation loop
+    </script>
+</body>
+</html>
