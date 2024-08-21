@@ -1,83 +1,41 @@
 const https = require("https");
 
 module.exports = async (req, res) => {
+  const { imgURL, caption } = req.query;
+  const instagramAccountId = "62447002037"; // Replace with your Instagram Account ID
+  const accessToken = process.env.ACCESS_TOKEN; // Store this in your environment variables
+
+  if (!imgURL || !caption) {
+    return res.status(400).json({ error: "imgURL and caption are required" });
+  }
+
   try {
-    const { imgURL, caption } = req.query;
-    if (!imgURL || !caption) {
-      return res.status(400).json({ error: "imgURL and caption are required" });
-    }
+    // Step 1: Create the media object
+    const mediaCreationId = await createMediaObject(instagramAccountId, imgURL, caption, accessToken);
 
-    const pageId = "61564885735775"; // Replace with your Facebook Page ID
-    const accessToken = process.env.ACCESS_TOKEN;
-
-    // Step 1: Get Instagram Account ID
-    const igAccountId = await getInstagramAccountId(pageId, accessToken);
-    if (!igAccountId) {
-      throw new Error("Failed to retrieve Instagram Account ID.");
-    }
-
-    // Step 2: Create Media Object
-    const mediaCreationId = await createMediaObject(igAccountId, imgURL, caption, accessToken);
     if (!mediaCreationId) {
-      throw new Error("Failed to create media object.");
+      return res.status(500).json({ error: "Failed to create media object" });
     }
 
-    // Step 3: Publish Media
-    const publishStatus = await publishMedia(igAccountId, mediaCreationId, accessToken);
-    if (!publishStatus) {
-      throw new Error("Failed to publish the post.");
-    }
+    // Step 2: Publish the media object
+    const publishStatus = await publishMedia(instagramAccountId, mediaCreationId, accessToken);
 
-    res.status(200).json({ message: "Post published successfully!" });
+    if (publishStatus) {
+      res.status(200).json({ message: "Post published successfully!" });
+    } else {
+      res.status(500).json({ error: "Failed to publish the post" });
+    }
   } catch (error) {
-    console.error("Error in Instagram Post API:", error);
-    res.status(500).json({ error: "Internal Server Error: " + error.message });
+    console.error("Internal Server Error:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
-function getInstagramAccountId(pageId, accessToken) {
+function createMediaObject(instagramAccountId, imgURL, caption, accessToken) {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: "graph.facebook.com",
-      path: `/v17.0/${pageId}?fields=instagram_business_account&access_token=${accessToken}`,
-      method: "GET",
-    };
-
-    const req = https.request(options, (res) => {
-      let data = "";
-
-      res.on("data", (chunk) => {
-        data += chunk;
-      });
-
-      res.on("end", () => {
-        try {
-          const jsonResponse = JSON.parse(data);
-          const igAccountId = jsonResponse.instagram_business_account?.id;
-          resolve(igAccountId);
-        } catch (err) {
-          console.error("Error parsing Instagram Account ID response:", err);
-          reject(err);
-        }
-      });
-    });
-
-    req.on("error", (error) => {
-      console.error("Error in getInstagramAccountId request:", error);
-      reject(error);
-    });
-
-    req.end();
-  });
-}
-
-function createMediaObject(igAccountId, imgURL, caption, accessToken) {
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: "graph.facebook.com",
-      path: `/v17.0/${igAccountId}/media?image_url=${encodeURIComponent(
-        imgURL
-      )}&caption=${encodeURIComponent(caption)}&access_token=${accessToken}`,
+      path: `/v17.0/${instagramAccountId}/media?image_url=${encodeURIComponent(imgURL)}&caption=${encodeURIComponent(caption)}&access_token=${accessToken}`,
       method: "POST",
     };
 
@@ -93,15 +51,13 @@ function createMediaObject(igAccountId, imgURL, caption, accessToken) {
           const jsonResponse = JSON.parse(data);
           const mediaCreationId = jsonResponse.id;
           resolve(mediaCreationId);
-        } catch (err) {
-          console.error("Error parsing createMediaObject response:", err);
-          reject(err);
+        } catch (e) {
+          reject(e);
         }
       });
     });
 
     req.on("error", (error) => {
-      console.error("Error in createMediaObject request:", error);
       reject(error);
     });
 
@@ -109,11 +65,11 @@ function createMediaObject(igAccountId, imgURL, caption, accessToken) {
   });
 }
 
-function publishMedia(igAccountId, mediaCreationId, accessToken) {
+function publishMedia(instagramAccountId, mediaCreationId, accessToken) {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: "graph.facebook.com",
-      path: `/v17.0/${igAccountId}/media_publish?creation_id=${mediaCreationId}&access_token=${accessToken}`,
+      path: `/v17.0/${instagramAccountId}/media_publish?creation_id=${mediaCreationId}&access_token=${accessToken}`,
       method: "POST",
     };
 
@@ -128,15 +84,13 @@ function publishMedia(igAccountId, mediaCreationId, accessToken) {
         try {
           const jsonResponse = JSON.parse(data);
           resolve(jsonResponse.id ? true : false);
-        } catch (err) {
-          console.error("Error parsing publishMedia response:", err);
-          reject(err);
+        } catch (e) {
+          reject(e);
         }
       });
     });
 
     req.on("error", (error) => {
-      console.error("Error in publishMedia request:", error);
       reject(error);
     });
 
