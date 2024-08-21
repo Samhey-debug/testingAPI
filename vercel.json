@@ -28,6 +28,9 @@
     }, {
       "src": "api/insta-post.js",
       "use": "@vercel/node"
+    }, {
+      "src": "api/v1/public/tr.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -58,6 +61,9 @@
     }, {
       "src": "/api/insta-post",
       "dest": "/api/insta-post.js"
+    }, {
+      "src": "/api/v1/public/tr",
+      "dest": "/api/v1/public/tr.js"
     }
     
   ]
