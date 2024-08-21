@@ -29,7 +29,7 @@
       "src": "api/insta-post.js",
       "use": "@vercel/node"
     }, {
-      "src": "api/v1/public/tr.js",
+      "src": "api/tr.js",
       "use": "@vercel/node"
     }
   ],
@@ -62,8 +62,8 @@
       "src": "/api/insta-post",
       "dest": "/api/insta-post.js"
     }, {
-      "src": "/api/v1/public/tr",
-      "dest": "/api/v1/public/tr.js"
+      "src": "/api/tr",
+      "dest": "/api/tr.js"
     }
     
   ]
