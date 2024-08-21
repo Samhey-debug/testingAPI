@@ -2,8 +2,8 @@ const https = require("https");
 
 module.exports = async (req, res) => {
   const { imgURL, caption } = req.query;
-  const instagramAccountId = "62447002037"; // Replace with your Instagram Account ID
-  const accessToken = process.env.ACCESS_TOKEN; // Store this in your environment variables
+  const instagramAccountId = "62447002037"; // Your Instagram Account ID
+  const accessToken = process.env.ACCESS_TOKEN; // Ensure this is correctly set in your environment variables
 
   if (!imgURL || !caption) {
     return res.status(400).json({ error: "imgURL and caption are required" });
@@ -49,15 +49,22 @@ function createMediaObject(instagramAccountId, imgURL, caption, accessToken) {
       res.on("end", () => {
         try {
           const jsonResponse = JSON.parse(data);
-          const mediaCreationId = jsonResponse.id;
-          resolve(mediaCreationId);
+          if (jsonResponse.error) {
+            console.error("Error creating media object:", jsonResponse.error);
+            resolve(null); // or reject with an error message
+          } else {
+            const mediaCreationId = jsonResponse.id;
+            resolve(mediaCreationId);
+          }
         } catch (e) {
+          console.error("Error parsing response:", e);
           reject(e);
         }
       });
     });
 
     req.on("error", (error) => {
+      console.error("Request error:", error);
       reject(error);
     });
 
@@ -83,14 +90,21 @@ function publishMedia(instagramAccountId, mediaCreationId, accessToken) {
       res.on("end", () => {
         try {
           const jsonResponse = JSON.parse(data);
-          resolve(jsonResponse.id ? true : false);
+          if (jsonResponse.error) {
+            console.error("Error publishing media:", jsonResponse.error);
+            resolve(false); // or reject with an error message
+          } else {
+            resolve(true);
+          }
         } catch (e) {
+          console.error("Error parsing response:", e);
           reject(e);
         }
       });
     });
 
     req.on("error", (error) => {
+      console.error("Request error:", error);
       reject(error);
     });
 
