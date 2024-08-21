@@ -1,43 +1,57 @@
-const express = require('express');
 const fetch = require('node-fetch');
 
-const app = express();
+module.exports = async (req, res) => {
+  if (req.method === 'POST' && req.url === '/translate') {
+    let body = '';
 
-// Middleware to parse JSON requests
-app.use(express.json());
-
-// Translate route
-app.post('/translate', async (req, res) => {
-  try {
-    const { text, targetLanguage } = req.body;
-
-    if (!text || !targetLanguage) {
-      return res.status(400).json({ error: 'Text and targetLanguage are required.' });
-    }
-
-    const response = await fetch('https://libretranslate.de/translate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        q: text,
-        source: 'auto', // Detect source language automatically
-        target: targetLanguage,
-        format: 'text'
-      })
+    req.on('data', chunk => {
+      body += chunk.toString(); // Convert Buffer to string
     });
 
-    if (!response.ok) {
-      throw new Error('Translation API request failed');
-    }
+    req.on('end', async () => {
+      try {
+        const { text, targetLanguage } = JSON.parse(body);
 
-    const data = await response.json();
-    const translatedText = data.translatedText;
+        if (!text || !targetLanguage) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Text and targetLanguage are required.' }));
+          return;
+        }
 
-    res.json({ translatedText });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+        const response = await fetch('https://libretranslate.de/translate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            q: text,
+            source: 'auto',
+            target: targetLanguage,
+            format: 'text'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Translation API request failed');
+        }
+
+        const data = await response.json();
+        const translatedText = data.translatedText;
+
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ translatedText }));
+      } catch (error) {
+        console.error(error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'Internal Server Error' }));
+      }
+    });
+  } else {
+    res.statusCode = 404;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'Not Found' }));
   }
-});
+};
