@@ -1,6 +1,7 @@
 const fetch = require('node-fetch');
 const fs = require('fs');
 const path = require('path');
+const FormData = require('form-data');
 
 module.exports = async (req, res) => {
     const { token, channelID, channelID2 } = req.query;
@@ -70,15 +71,15 @@ function formatMessages(messages) {
 // Function to upload the file to a specified Discord channel
 async function uploadFileToChannel(token, channelID, filePath, fileName) {
     const url = `https://discord.com/api/v10/channels/${channelID}/messages`;
-    const formData = new FormData();
-    formData.append('file', fs.createReadStream(filePath), fileName);
+    const form = new FormData();
+    form.append('file', fs.createReadStream(filePath), fileName);
 
     const response = await fetch(url, {
         method: 'POST',
         headers: {
             Authorization: `Bot ${token}`,
         },
-        body: formData,
+        body: form,
     });
 
     if (!response.ok) {
