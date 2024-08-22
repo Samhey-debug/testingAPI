@@ -1,6 +1,4 @@
 const fetch = require('node-fetch');
-const fs = require('fs');
-const path = require('path');
 
 module.exports = async (req, res) => {
     const { token, channelID, channelID2 } = req.query;
@@ -12,19 +10,21 @@ module.exports = async (req, res) => {
     try {
         // Fetch channel details to get the channel name
         const channelDetails = await fetchChannelDetails(token, channelID);
-        const channelName = sanitizeFileName(channelDetails.name); // Sanitize the channel name to make it safe for URLs
+        const channelName = sanitizeFileName(channelDetails.name); // Sanitize the channel name for URLs
 
         const messages = await fetchMessages(token, channelID);
         const formattedMessages = formatMessages(messages);
         const htmlContent = generateHTMLPage(channelName, formattedMessages);
-        const filePath = path.join('/tmp', `${channelName}.html`);
 
-        fs.writeFileSync(filePath, htmlContent);
+        // Generate the URL to access the HTML page
+        const url = `https://${req.headers.host}/api/ticket?token=${token}&channelID=${channelID}`;
 
-        // Return the HTML file link instead of sending it to another channel
-        return res.status(200).json({
-            message: `View the messages at: https://${req.headers.host}/logs/${channelName}.html`,
-        });
+        // Send the URL to channelID2
+        await sendMessageToChannel(token, channelID2, `Here are the logs for #${channelName}: ${url}`);
+
+        // Return the generated HTML directly
+        res.setHeader('Content-Type', 'text/html');
+        return res.send(htmlContent);
     } catch (error) {
         console.error(error);
         return res.status(500).json({ error: 'An error occurred', details: error.message });
@@ -133,4 +133,23 @@ function generateHTMLPage(channelName, messages) {
         </div>
     </body>
     </html>`;
+}
+
+// Function to send a message to a specific Discord channel
+async function sendMessageToChannel(token, channelID, content) {
+    const url = `https://discord.com/api/v10/channels/${channelID}/messages`;
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bot ${token}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content }),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to send message to channel ${channelID}: ${response.statusText}`);
+    }
+
+    return await response.json();
 }
