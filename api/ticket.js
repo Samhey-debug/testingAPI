@@ -21,7 +21,7 @@ module.exports = async (req, res) => {
 
         fs.writeFileSync(filePath, formattedMessages);
 
-        await new Promise(resolve => setTimeout(resolve, 700));
+        await new Promise(resolve => setTimeout(resolve, 1500));
 
         const uploadResult = await uploadFileToChannel(token, channelID2, filePath, fileName);
 
