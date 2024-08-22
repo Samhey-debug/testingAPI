@@ -1,28 +1,32 @@
-const fetch = require('node-fetch');
+import { writeFileSync } from 'fs';
+import { join } from 'path';
 
-module.exports = async (req, res) => {
-    const { token, channelID } = req.query;
+export default function handler(req, res) {
+  // Ensure the /logs directory exists
+  const logsDir = join(process.cwd(), 'logs');
 
-    if (!token || !channelID) {
-        return res.status(400).json({ error: 'Missing required parameters: token, channelID' });
-    }
+  // Create a unique filename
+  const timestamp = Date.now();
+  const logFilename = `log-${timestamp}.html`;
+  const logFilePath = join(logsDir, logFilename);
 
-    try {
-        // Fetch channel details to get the channel name
-        const channelDetails = await fetchChannelDetails(token, channelID);
-        const channelName = sanitizeFileName(channelDetails.name); // Sanitize the channel name to make it safe for URLs
+  // Define the content of the new page
+  const logContent = `
+    <html>
+      <head>
+        <title>Log Page - ${timestamp}</title>
+      </head>
+      <body>
+        <h1>Log Page Created at ${new Date().toISOString()}</h1>
+        <p>This is a sample log entry.</p>
+      </body>
+    </html>
+  `;
 
-        const messages = await fetchMessages(token, channelID);
-        const formattedMessages = formatMessages(messages);
-        const htmlContent = generateHTMLPage(channelName, formattedMessages);
+  // Write the content to the file
+  writeFileSync(logFilePath, logContent);
 
-        // Directly return the generated HTML content as the response
-        res.setHeader('Content-Type', 'text/html');
-        return res.status(200).send(htmlContent);
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ error: 'An error occurred', details: error.message });
-    }
-};
-
-// Fetch and utility functions remain unchanged (fetchChannelDetails, fetchMessages, formatMessages, sanitizeFileName, generateHTMLPage)
+  // Return the URL of the created log page
+  const logUrl = `${req.headers.host}/logs/${logFilename}`;
+  res.status(200).json({ url: `https://${logUrl}` });
+}
