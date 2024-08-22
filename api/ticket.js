@@ -11,9 +11,8 @@ module.exports = async (req, res) => {
     }
 
     try {
-        // Fetch channel details to get the channel name
         const channelDetails = await fetchChannelDetails(token, channelID);
-        const channelName = sanitizeFileName(channelDetails.name); // Sanitize the channel name to make it safe for file names
+        const channelName = sanitizeFileName(channelDetails.name);
 
         const messages = await fetchMessages(token, channelID);
         const formattedMessages = formatMessages(messages);
@@ -22,10 +21,10 @@ module.exports = async (req, res) => {
 
         fs.writeFileSync(filePath, formattedMessages);
 
-        // Send the file to the second channel
+        await new Promise(resolve => setTimeout(resolve, 700));
+
         const uploadResult = await uploadFileToChannel(token, channelID2, filePath, fileName);
 
-        // Clean up the file after sending
         fs.unlinkSync(filePath);
 
         return res.status(200).json({ message: `Messages sent to channel ${channelID2}`, uploadResult });
@@ -35,7 +34,6 @@ module.exports = async (req, res) => {
     }
 };
 
-// Function to fetch channel details (including name)
 async function fetchChannelDetails(token, channelID) {
     const url = `https://discord.com/api/v10/channels/${channelID}`;
     const response = await fetch(url, {
@@ -51,7 +49,6 @@ async function fetchChannelDetails(token, channelID) {
     return await response.json();
 }
 
-// Function to fetch all messages from a channel
 async function fetchMessages(token, channelID) {
     let allMessages = [];
     let lastMessageID;
@@ -75,10 +72,9 @@ async function fetchMessages(token, channelID) {
         lastMessageID = messages[messages.length - 1].id;
     }
 
-    return allMessages.reverse(); // To get messages in chronological order
+    return allMessages.reverse();
 }
 
-// Function to format messages into a clean text format with emoji handling
 function formatMessages(messages) {
     return messages
         .map(
@@ -93,29 +89,22 @@ function formatMessages(messages) {
         .join('\n');
 }
 
-// Function to replace Discord emoji shortcodes and custom emojis with readable text
 function replaceEmojis(content) {
-    // Replace custom emojis in the format <emoji_name:emoji_id> with [emoji_name]
     content = content.replace(/<:\w+:(\d+)>/g, match => `[${match.split(':')[1]}]`);
 
-    // Replace standard Discord shortcodes like :smile: with their Unicode equivalents
-    // You can add more replacements as needed
     const emojiMap = {
         ":smile:": "😄",
         ":heart:": "❤️",
         ":thumbsup:": "👍",
-        // Add more as needed
     };
 
     return content.replace(/:\w+:/g, match => emojiMap[match] || match);
 }
 
-// Function to sanitize the channel name for safe file naming
 function sanitizeFileName(name) {
-    return name.replace(/[^a-z0-9]/gi, '_').toLowerCase(); // Replace unsafe characters with underscores
+    return name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 }
 
-// Function to upload the file to a specified Discord channel
 async function uploadFileToChannel(token, channelID, filePath, fileName) {
     const url = `https://discord.com/api/v10/channels/${channelID}/messages`;
     const form = new FormData();
