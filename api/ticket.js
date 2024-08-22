@@ -11,9 +11,13 @@ module.exports = async (req, res) => {
     }
 
     try {
+        // Fetch channel details to get the channel name
+        const channelDetails = await fetchChannelDetails(token, channelID);
+        const channelName = sanitizeFileName(channelDetails.name); // Sanitize the channel name to make it safe for file names
+
         const messages = await fetchMessages(token, channelID);
         const formattedMessages = formatMessages(messages);
-        const fileName = `${channelID}.txt`;
+        const fileName = `${channelName}.txt`;
         const filePath = path.join('/tmp', fileName);
 
         fs.writeFileSync(filePath, formattedMessages);
@@ -30,6 +34,22 @@ module.exports = async (req, res) => {
         return res.status(500).json({ error: 'An error occurred', details: error.message });
     }
 };
+
+// Function to fetch channel details (including name)
+async function fetchChannelDetails(token, channelID) {
+    const url = `https://discord.com/api/v10/channels/${channelID}`;
+    const response = await fetch(url, {
+        headers: {
+            Authorization: `Bot ${token}`,
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to fetch channel details: ${response.statusText}`);
+    }
+
+    return await response.json();
+}
 
 // Function to fetch all messages from a channel
 async function fetchMessages(token, channelID) {
@@ -58,14 +78,41 @@ async function fetchMessages(token, channelID) {
     return allMessages.reverse(); // To get messages in chronological order
 }
 
-// Function to format messages into a clean text format
+// Function to format messages into a clean text format with emoji handling
 function formatMessages(messages) {
     return messages
         .map(
-            msg =>
-                `[${new Date(msg.timestamp).toLocaleString()}] ${msg.author.username}#${msg.author.discriminator}: ${msg.content}`
+            msg => {
+                const time = new Date(msg.timestamp).toLocaleString();
+                const author = `${msg.author.username}#${msg.author.discriminator}`;
+                const content = replaceEmojis(msg.content);
+
+                return `[${time}] ${author}: ${content}`;
+            }
         )
         .join('\n');
+}
+
+// Function to replace Discord emoji shortcodes and custom emojis with readable text
+function replaceEmojis(content) {
+    // Replace custom emojis in the format <emoji_name:emoji_id> with [emoji_name]
+    content = content.replace(/<:\w+:(\d+)>/g, match => `[${match.split(':')[1]}]`);
+
+    // Replace standard Discord shortcodes like :smile: with their Unicode equivalents
+    // You can add more replacements as needed
+    const emojiMap = {
+        ":smile:": "😄",
+        ":heart:": "❤️",
+        ":thumbsup:": "👍",
+        // Add more as needed
+    };
+
+    return content.replace(/:\w+:/g, match => emojiMap[match] || match);
+}
+
+// Function to sanitize the channel name for safe file naming
+function sanitizeFileName(name) {
+    return name.replace(/[^a-z0-9]/gi, '_').toLowerCase(); // Replace unsafe characters with underscores
 }
 
 // Function to upload the file to a specified Discord channel
