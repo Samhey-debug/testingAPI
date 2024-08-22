@@ -5,9 +5,7 @@
   "main": "index.js",
   "dependencies": {
     "node-fetch": "^2.6.1",
-    "discord.js": "^13.0.0",
-    "@discordjs/voice": "^0.7.0",
-    "ytdl-core": "^4.9.1",
+    "form-data": "^4.0.0",
     "tone": "^14.7.77",
     "serve": "^14.2.0"
   },
