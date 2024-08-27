@@ -2,69 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/clone-server.js",
-      "use": "@vercel/node"
-    }, {
-      "src": "api/vc.js",
-      "use": "@vercel/node"
-    }, {
-      "src": "api/userphone.js",
-      "use": "@vercel/node"
-    }, {
-      "src": "api/dc.js",
-      "use": "@vercel/node"
-    }, {
-      "src": "api/cc.js",
-      "use": "@vercel/node"
-    }, {
-      "src": "api/cr.js",
-      "use": "@vercel/node"
-    }, {
-      "src": "api/cc-extended.js",
-      "use": "@vercel/node"
-    }, {
-      "src": "api/cc-extended-220.js",
-      "use": "@vercel/node"
-    }, {
-      "src": "api/insta-post.js",
-      "use": "@vercel/node"
-    }, {
-      "src": "api/ticket.js",
+      "src": "api/**/*.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
-      "src": "/api/clone-server",
-      "dest": "/api/clone-server.js"
-    }, {
-      "src": "/api/vc",
-      "dest": "/api/vc.js"
-    }, {
-      "src": "/api/userphone",
-      "dest": "/api/userphone.js"
-    }, {
-      "src": "/api/dc",
-      "dest": "/api/dc.js"
-    }, {
-      "src": "/api/cr",
-      "dest": "/api/cr.js"
-    }, {
-      "src": "/api/cc",
-      "dest": "/api/cc.js"
-    }, {
-      "src": "/api/cc-extended",
-      "dest": "/api/cc-extended.js"
-    }, {
-      "src": "/api/cc-extended-220",
-      "dest": "/api/cc-extended-220.js"
-    }, {
-      "src": "/api/insta-post",
-      "dest": "/api/insta-post.js"
-    }, {
-      "src": "/api/ticket",
-      "dest": "/api/ticket.js"
+      "src": "/api/(.*)",
+      "dest": "/api/$1.js"
     }
-    
   ]
 }
