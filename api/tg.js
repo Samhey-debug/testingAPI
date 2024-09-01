@@ -35,7 +35,7 @@ export default async function handler(req, res) {
             description: `${username} has just voted on top.gg! Thank you!`,
             color: 0x01AEC4, // Hex color value
             thumbnail: {
-                url: `https://cdn.discordapp.com/avatars/${bot}/${bot}.png`
+                url: `https://i.imgur.com/nhTkhEn.gif`
             },
             footer: {
                 text: 'Powered by Server Maker',
