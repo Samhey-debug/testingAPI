@@ -31,15 +31,16 @@ export default async function handler(req, res) {
 
         // Construct the embed for the main message
         const embed = {
-            title: `Thank you, ${username}`,
-            description: `${username} has just voted on [top.gg](https://top.gg/bot/1233001713242476678/vote)! Thank you!`,
+            title: `Thank you, ${username}!`,
+            description: `${username} has just voted on [top.gg](https://top.gg/bot/1233001713242476678/vote)! Your support means a lot to us.`,
             color: 0x01AEC4, // Hex color value
             thumbnail: {
-                url: `https://i.imgur.com/nhTkhEn.gif`
+                url: 'https://i.imgur.com/nhTkhEn.gif'
             },
             footer: {
                 text: 'Powered by Server Maker',
-            }
+            },
+            timestamp: new Date(),
         };
 
         const messageContent = {
@@ -66,12 +67,20 @@ export default async function handler(req, res) {
 
         // Log the request details to a different channel
         const logChannelID = '1278454337500086312'; // Replace with your log channel ID
+        const logEmbed = {
+            title: 'Webhook Request Received',
+            color: 0x01AEC4,
+            fields: [
+                { name: 'User ID', value: user, inline: true },
+                { name: 'Bot ID', value: bot, inline: true },
+                { name: 'Type', value: type, inline: true },
+                { name: 'Request Body', value: `\`\`\`json\n${JSON.stringify(req.body, null, 2)}\n\`\`\``, inline: false }
+            ],
+            timestamp: new Date(),
+        };
+
         const logMessageContent = {
-            content: `**Top.gg Webhook Received**\n` +
-                     `**User ID:** ${user}\n` +
-                     `**Bot ID:** ${bot}\n` +
-                     `**Type:** ${type}\n` +
-                     `**Request Body:** ${JSON.stringify(req.body, null, 2)}`
+            embeds: [logEmbed],
         };
 
         const logEndpoint = `https://discord.com/api/v10/channels/${logChannelID}/messages`;
