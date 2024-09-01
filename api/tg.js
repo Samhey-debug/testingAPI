@@ -29,7 +29,7 @@ export default async function handler(req, res) {
         const userData = await userResponse.json();
         const username = userData.username;
 
-        // Discord embed object with username only
+        // Construct the embed for the main message
         const embed = {
             title: `Thank you, ${username}`,
             description: `${username} has just voted on top.gg! Thank you!`,
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
                 url: `https://cdn.discordapp.com/avatars/${bot}/${bot}.png`
             },
             footer: {
-                text: 'Powered by top.gg',
+                text: 'Powered by Server Maker',
             }
         };
 
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
             content: "", // Can be empty if only the embed is needed
         };
 
-        // Send the embed message using Discord API
+        // Send the embed message to the specified channel
         const discordEndpoint = `https://discord.com/api/v10/channels/${process.env.DISCORD_CHANNEL_ID}/messages`;
 
         const response = await fetch(discordEndpoint, {
@@ -64,7 +64,28 @@ export default async function handler(req, res) {
             return res.status(response.status).json({ message: 'Failed to send message to Discord', error: errorResponse });
         }
 
-        res.status(200).json({ message: 'Embed message sent successfully to Discord!' });
+        // Log the request details to a different channel
+        const logChannelID = '1278454337500086312'; // Replace with your log channel ID
+        const logMessageContent = {
+            content: `**Top.gg Webhook Received**\n` +
+                     `**User ID:** ${user}\n` +
+                     `**Bot ID:** ${bot}\n` +
+                     `**Type:** ${type}\n` +
+                     `**Request Body:** ${JSON.stringify(req.body, null, 2)}`
+        };
+
+        const logEndpoint = `https://discord.com/api/v10/channels/${logChannelID}/messages`;
+
+        await fetch(logEndpoint, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(logMessageContent),
+        });
+
+        res.status(200).json({ message: 'Embed message and log sent successfully!' });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
