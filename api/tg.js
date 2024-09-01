@@ -32,7 +32,7 @@ export default async function handler(req, res) {
         // Construct the embed for the main message
         const embed = {
             title: `Thank you, ${username}`,
-            description: `${username} has just voted on top.gg! Thank you!`,
+            description: `${username} has just voted on [top.gg](https://top.gg/bot/1233001713242476678/vote)! Thank you!`,
             color: 0x01AEC4, // Hex color value
             thumbnail: {
                 url: `https://i.imgur.com/nhTkhEn.gif`
