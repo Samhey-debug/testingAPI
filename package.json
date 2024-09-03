@@ -7,7 +7,8 @@
     "node-fetch": "^2.6.1",
     "form-data": "^4.0.0",
     "tone": "^14.7.77",
-    "serve": "^14.2.0"
+    "serve": "^14.2.0",
+    "canvas": "^2.11.2"  // Added canvas package here
   },
   "engines": {
     "node": ">=16.6.0"
