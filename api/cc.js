@@ -22,7 +22,7 @@ module.exports = async (req, res) => {
     try {
         // Fetch channels from the source guild
         const sourceChannelsResponse = await fetchWithRetry(`https://discord.com/api/v10/guilds/${sourceGuildId}/channels`, {
-            headers: { 'Authorization': `Bot ${token}` }
+            headers: { 'Authorization': process.env.ATCF }
         });
         const sourceChannels = await sourceChannelsResponse.json();
 
