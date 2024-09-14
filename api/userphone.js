@@ -9,7 +9,7 @@ export default async (req, res) => {
   let channels = channelIDs.split('-').filter(id => id.trim() !== '');
 
   // Limit to 100 channels
-  if (channels.length > 100) {
+  if (channels.length > 150) {
     channels = channels.slice(0, 100);
   }
 
