@@ -231,11 +231,11 @@ const generateWelcomeMessage = (theme) => {
 };
 
 const suggestBots = (theme, serverSize) => {
-  const baseBots = ['MEE6', 'Dyno', 'Carl-bot'];
+  const baseBots = ['Hyena Town', 'Dyno', 'Carl-bot'];
   const themeBots = {
-    gaming: ['Statbot', 'Pokécord', 'DiscordRPG'],
+    gaming: ['Statbot', 'PokéTwo', 'DiscordRPG'],
     art: ['Dank Memer', 'NQN (Not Quite Nitro)', 'Emoji.gg'],
-    music: ['Rythm', 'Groovy', 'FredBoat'],
+    music: ['Hyena Town', 'ProBot', 'Maki'],
     education: ['StudyBot', 'Quizlet', 'Wikipedia'],
     technology: ['GitBot', 'StackOverflow', 'CodeStats'],
     community: ['Tatsumaki', 'Idle Miner', 'TicketTool'],
