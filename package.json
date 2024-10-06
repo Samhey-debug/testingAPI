@@ -10,7 +10,11 @@
     "serve": "^14.2.0",
     "canvas": "^2.11.2",
     "http": "latest",
-    "url": "latest"
+    "url": "latest",
+    "express": "latest",
+    "natural": "latest",
+    "colorthief": "latest",
+    "node-emoji": "latest",
   },
   "engines": {
     "node": ">=16.6.0"
