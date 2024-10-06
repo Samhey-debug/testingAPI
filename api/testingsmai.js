@@ -249,7 +249,7 @@ const generateCustomization = (size) => ({
 
 const capitalize = str => str.charAt(0).toUpperCase() + str.slice(1);
 
-app.get('/api/generate-server', (req, res) => {
+app.get('/api/testingsmai', (req, res) => {
   const prompt = req.query.prompt;
   if (!prompt) {
     return res.status(400).json({ error: 'Missing prompt parameter' });
