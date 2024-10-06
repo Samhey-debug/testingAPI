@@ -14,7 +14,7 @@
     "express": "latest",
     "natural": "latest",
     "colorthief": "latest",
-    "node-emoji": "latest",
+    "node-emoji": "latest"
   },
   "engines": {
     "node": ">=16.6.0"
