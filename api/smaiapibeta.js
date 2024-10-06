@@ -705,7 +705,7 @@ const shuffleArray = (array) => {
 const server = http.createServer((req, res) => {
   const parsedUrl = url.parse(req.url, true);
 
-  if (parsedUrl.pathname === '/api/smaiapi' && req.method === 'GET') {
+  if (parsedUrl.pathname === '/api/smaiapibeta' && req.method === 'GET') {
     const prompt = parsedUrl.query.prompt;
 
     if (!prompt) {
@@ -718,7 +718,10 @@ const server = http.createServer((req, res) => {
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(serverConfig, null, 2));
-  } // here
+  } else {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('404 Not Found');
+  }
 });
 
 const PORT = process.env.PORT || 3000;
