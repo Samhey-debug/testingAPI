@@ -13,6 +13,7 @@
     "url": "latest",
     "express": "latest",
     "natural": "latest",
+    "sentiment": "latest",
     "colorthief": "latest",
     "node-emoji": "latest"
   },
