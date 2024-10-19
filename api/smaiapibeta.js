@@ -255,7 +255,7 @@ const generateCategories = (keywords, theme, serverSize) => {
 const server = http.createServer((req, res) => {
   const parsedUrl = url.parse(req.url, true);
 
-  if (parsedUrl.pathname === '/api/smaiapi' && req.method === 'GET') {
+  if (parsedUrl.pathname === '/api/smaiapibeta' && req.method === 'GET') {
     const prompt = parsedUrl.query.prompt;
 
     if (!prompt) {
